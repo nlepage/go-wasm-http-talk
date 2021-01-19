@@ -8,7 +8,7 @@ enableChalkboard: false
 enableTitleFooter: false
 enableZoom: false
 enableSearch: false
-css: styles.css
+css: assets/styles.css
 ---
 
 # Deploy a Go HTTP server in your browser
