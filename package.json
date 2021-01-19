@@ -1,0 +1,13 @@
+{
+  "name": "go-wasm-http-talk",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Unlicense",
+  "scripts": {
+    "build": "reveal-md slides.md --static ./docs/",
+    "start": "reveal-md slides.md -w"
+  },
+  "dependencies": {
+    "reveal-md": "^4.1.7"
+  }
+}
