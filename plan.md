@@ -1,0 +1,6 @@
+- Intercepting HTTP requests in the ServiceWorker and passing it to the Go wasm binary
+- Mapping a JS HTTP Request object into a Go http.Request struct
+- Building a fake http.ResponseWriter to store the result of the request
+- Using http.Handlers to handle the request
+- Mapping back the fake http.ResponseWriter to a JS HTTP Response Object
+- Responding to the request from the ServiceWorker

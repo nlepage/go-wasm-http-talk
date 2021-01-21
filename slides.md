@@ -54,13 +54,32 @@ Notes:
 Notes:
 - Now let's take a step back and review how we usually build a Go HTTP server.
 - The most straightforward way is to use the `net/http` package.
-- First you define your HTTP handlers using `Handle()` which accepts a `Handler` or `HandleFunc()` which accepts a function.
-- Indeed, handlers are simple functions which receive a `Request` and a `ResponseWriter` ; so we can already see that this looks a lot like the service worker's fetch event
-- You may also choose to define your handlers using some third party libraries, such as `gorilla/mux`.
-- Then, once your handlers are defined, in most cases you will call `ListenAndServe()`, which will start listening for HTTP requests and use your handlers to respond to these.
+- First we define HTTP handlers using `Handle()` which accepts a `Handler` or `HandleFunc()` which accepts a simple function.
+- Indeed, handlers are simple functions which receive a `Request` and a `ResponseWriter`; so we can already see that this looks a lot like the service worker's `FetchEvent`
+- We may also choose to define handlers using some third party libraries, such as `gorilla/mux`.
+- Then, once our handlers are defined, in most cases we will call `ListenAndServe()`, which will start listening for HTTP requests and use our handlers to respond to these.
 - In our case, we would like to reuse as much as possible of this code we wrote, but use it to respond to a request intercepted by a SW.
 - Of course, the one thing we are not going to be able to reuse is the call to `ListenAndServe()`.
 - But, this is OK, because we are going to take a pretty radical(?) shortcut.
 - Ususally when we call `ListenAndServe()`, it takes care of a lot of things for us under the hood, and for each request it calls the `Handler` if we gave one in parameter or `DefaultServeMux`, which is the default `Handler`.
 - So, here is our shortcut, we are going to directly call the `ServeHTTP()` method of our `Handler` or of `DefaultServeMux`.
-- FIXME...
+
+---
+
+## Build tags...
+
+Notes:
+- This is nice, because provided our handlers are wasm compatible, we can keep and reuse these as they are.
+- Now, ideally we still want to be able to build standard binaries of our server (linux, mac OS, or whatever), and also the wasm binary.
+- For this, we can move the `ListenAndServe()` call into its own file, and use build tags to tell the Go compiler that this file is not compatible with wasm.
+- Then we can create a specific file for wasm, this time using the file naming convention instead of the build tags.
+- And use our own API, which will probably look something like this, so a `Serve()` function which takes only a `Handler`, but no address.
+
+---
+
+## FIXME
+
+Notes:
+- FIXME
+- But, in order to do that, we have to create an instance of Go's `Request` struct from the Javascript `Request` object.
+- And we also need a second value compatible with the `ResponseWriter` interface, which will allow us to create a Javascript `Response` object.
