@@ -70,10 +70,10 @@ Notes:
 
 Notes:
 - This is nice, because provided our handlers are wasm compatible, we can keep and reuse these as they are.
-- Now, ideally we still want to be able to build standard binaries of our server (linux, mac OS, or whatever), and also the wasm binary.
+- Now, ideally we still want to be able to build standard binaries of our server working for linux, mac OS, or whatever, and also the wasm binary.
 - For this, we can move the `ListenAndServe()` call into its own file, and use build tags to tell the Go compiler that this file is not compatible with wasm.
-- Then we can create a specific file for wasm, this time using the file naming convention instead of the build tags.
-- And use our own API, which will probably look something like this, so a `Serve()` function which takes only a `Handler`, but no address.
+- Then we can create a specific file for wasm, this time using the file naming convention instead of the build tags, to tell the compiler that this file is compatible only with wasm.
+- And in this file we are going to use our own API, which will probably look something like this, so a `Serve()` function which takes only one `Handler` parameter, but no address parameter.
 
 ---
 
