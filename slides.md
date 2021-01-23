@@ -14,10 +14,20 @@ css: assets/styles.css
 # Deploy a Go HTTP server in your browser
 
 Notes:
-- Self presentation
-- Talk about...
-- First, thanks (Go devroom, Z)
-- Why? Explain. Example QR code generator. Catption demo?
+- Hi everybody, my name is Nicolas Lepage, I am a developer at Zenika IT in France. I work mainly with Javascript, and I also like experimenting with Go.
+- So, today I am going to talk about, deploying a Go HTTP server in your browser.
+
+## Why?
+
+Demo gifs...
+
+Notes:
+- But first, you may be wondering, why? Why would you want to do that?
+- Well, imagine I have this nice little project, it is a Go CLI tool called catption, that helps me add a text at the bottom or at the top of a JPEG image.
+- And it also has an http subcommand, which starts a little server, with an HTML form where you can do the same.
+- Now, I would like to put up a little demonstration server for my project.
+- But I don't want to actually deploy a Go server for that.
+- So that's how I started wondering if we could deploy a Go HTTP server in a browser.
 
 ---
 
@@ -28,12 +38,22 @@ Notes:
 - (Quickly explain WebAssembly?)
 - You get a wasm binary which can be downloaded and executed by a browser.
 - Of course, Go code executed in a browser has exactly the same limitations as any JavaScript code executed in the same browser.
-- For example, it will not be able to use the `io` package to access the client's file system.
+- For example, it will not be able to use the `os` package to access the client's file system.
 - So, it will also not be able to actually start an HTTP server in the browser.
 - However, when an HTTP request is sent from a web page, there is one case when it will not actually reach the server.
-- It may be intercepted by a service worker, which in most cases will respond to the request using for example some cache, or forwarding it to the actual server.
+- It may be intercepted by a service worker, which is usually allows web applications to work offline.
 - Now I think you are starting to see where I am going with this.
 - Would it be possible to execute a Go wasm binary in a service worker and use it to handle HTTP requests?
+
+---
+
+## Disclaimer
+
+Notes:
+- A little warning before we go any further.
+- When you are building to wasm, you have to make sure all your code and dependencies are compatible.
+- This means for example that you cannot rely on C bindings, or system dependencies, or a database server.
+- That being said, today I'm going to focus on the HTTP side of things.
 
 ---
 
@@ -62,7 +82,7 @@ Notes:
 - Of course, the one thing we are not going to be able to reuse is the call to `ListenAndServe()`.
 - But, this is OK, because we are going to take a pretty radical(?) shortcut.
 - Ususally when we call `ListenAndServe()`, it takes care of a lot of things for us under the hood, and for each request it calls the `Handler` if we gave one in parameter or `DefaultServeMux`, which is the default `Handler`.
-- So, here is our shortcut, we are going to directly call the `ServeHTTP()` method of our `Handler` or of `DefaultServeMux`.
+- So, here is our shortcut, we are going to directly call the `ServeHTTP()` method of the `Handler` or of `DefaultServeMux`.
 
 ---
 

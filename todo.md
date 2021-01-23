@@ -1,1 +1,0 @@
-- Limitation of what you can do in wasm (no databases, full Go...)
