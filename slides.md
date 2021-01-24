@@ -36,14 +36,14 @@ Notes:
 Notes:
 - Since Go 1.11, running a program written in Go in a browser is possible, if you build it to WebAssembly.
 - (Quickly explain WebAssembly?)
-- You get a wasm binary which can be downloaded and executed by a browser.
+- You get a WebAssembly binary which can be downloaded and executed by a browser.
 - Of course, Go code executed in a browser has exactly the same limitations as any JavaScript code executed in the same browser.
 - For example, it will not be able to use the `os` package to access the client's file system.
 - So, it will also not be able to actually start an HTTP server in the browser.
 - However, when an HTTP request is sent from a web page, there is one case when it will not actually reach the server.
 - It may be intercepted by a service worker, which is usually allows web applications to work offline.
 - Now I think you are starting to see where I am going with this.
-- Would it be possible to execute a Go wasm binary in a service worker and use it to handle HTTP requests?
+- Would it be possible to execute a Go WebAssembly binary in a service worker and use it to handle HTTP requests?
 
 ---
 
@@ -51,7 +51,7 @@ Notes:
 
 Notes:
 - A little warning before we go any further.
-- When you are building to wasm, you have to make sure all your code and dependencies are compatible.
+- When you are building to WebAssembly, you have to make sure all your code and dependencies are compatible.
 - This means for example that you cannot rely on C bindings, or system dependencies, or a database server.
 - That being said, today I'm going to focus on the HTTP side of things.
 
@@ -65,7 +65,7 @@ Notes:
 - The `FetchEvent` contains a `Request` object which holds all the information we need about the request (URL, method, headers), and also the body contents if any.
 - The `FetchEvent` also has a `respondWith()` method, which accepts one parameter of type `Response` or `Promise` for a `Response`.
 - So, by reading the `Request` object and building a `Response` object to give to `respondWith()`, we should be able to respond to an HTTP request from a service worker.
-- However, what we want is to delegate this task to a Go wasm binary.
+- However, what we want is to delegate this task to a Go WebAssembly binary.
 
 ---
 
@@ -89,10 +89,10 @@ Notes:
 ## Adding js/wasm target
 
 Notes:
-- This is nice, because provided our handlers are wasm compatible, we can keep and reuse these as they are.
-- Now, ideally we still want to be able to build standard binaries of our server working for linux, mac OS, or whatever, and also the wasm binary.
-- For this, we can move the `ListenAndServe()` call into its own file, and use build tags to tell the Go compiler that this file is not compatible with wasm.
-- Then we can create a specific file for wasm, this time using the file naming convention instead of the build tags, to tell the compiler that this file is compatible only with wasm.
+- This is nice, because provided our handlers are WebAssembly compatible, we can keep and reuse these as they are.
+- Now, ideally we still want to be able to build standard binaries of our server working for linux, mac OS, or whatever, and also the WebAssembly binary.
+- For this, we can move the `ListenAndServe()` call into its own file, and use build tags to tell the Go compiler that this file is not compatible with WebAssembly.
+- Then we can create a specific file for WebAssembly, this time using the file naming convention instead of the build tags, to tell the compiler that this file is compatible only with WebAssembly.
 - And in this file we are going to use our own API, which will probably look something like this, so a `Serve()` function which takes only one `Handler` parameter, but no address parameter.
 
 ---
@@ -134,20 +134,22 @@ Notes:
 - How are we going to copy the raw binary data of the request body from Javascript to Go?
 - Luckily for us, the `syscall/js` package has `CopyBytesToGo()` function for that.
 - It takes a byte slice as destination, and a reference to a Javascript `Uint8Array` as source.
-- FIXME
+- So this is OK, with just a few more plumbing we should be able to copy the body content from Javascript to Go.
+- We call the `arrayBuffer()` method of the Javascript `Request`, which returns a `Promise` for an `ArrayBuffer`, we wait for this `Promise` to be resolved, then we can wrap the `ArrayBuffer`, into an `Uint8Array`.
+- Now we have a Go request, the only important information missing, is the headers of the request.
+- The headers are stored in a simple map of strings, both in Javascript and Go, so we just iterate and set each header on our new Go `Request`.
+- Now we are done!
 
-
-
-
-
-
-
-
-
-
-
+## Calling the HTTP Handler
 
 Notes:
-- FIXME
-- But, in order to do that, we have to create an instance of Go's `Request` struct from the Javascript `Request` object.
-- And we also need a second value compatible with the `ResponseWriter` interface, which will allow us to create a Javascript `Response` object.
+- We are almost ready to call the `Handler`.
+- We only need a value for its second parameter, which type is the `ResponseWriter` interface.
+- For this, the `httptest` package has a `ResponseRecorder` type, which implements `ResponseWriter` and records the response.
+- And now we are able to call the `Handler`'s `ServerHTTP()` method.
+- Once the `Handler` returns, the last thing we have to do is read the result of the `ResponseRecorder`, which is an `http.Response` struct, and build a Javascript Object `Response` from it.
+
+## Go response to Javascript Response
+
+Notes:
+ - FIXME
