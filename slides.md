@@ -97,11 +97,11 @@ Notes:
 
 ---
 
-## Implementing `Serve()`
+## Implement `wasmhttp.Serve()`
 
 Notes:
 - Now let's dive in the implementation of this `Serve()` function.
-- It needs to receive the Javascript request objects, so from the Javascript point of view, the ServiceWorker needs to have some callback from the Webassembly binary, in order to give each `Request` object.
+- It needs to receive the Javascript request objects, so from the Javascript point of view, the ServiceWorker needs to have some callback from the Webassembly binary, in order to call it with each `Request` object.
 - At the moment, Go Webassembly binaries have no way to export functions or other values.
 - So in order to work around this, the `Serve()` function will have to register a callback function with the ServiceWorker.
 - The `syscall/js` package allows to create such callback functions using `FuncOf()`.
@@ -110,7 +110,42 @@ Notes:
 - Then the `Serve` function can register the callback with the ServiceWorker, by calling a setter function previously declared in the ServiceWorker's global scope.
 - And this it, the ServiceWorker is now able to forward the FetchEvent's requests to the WebAssembly binary.
 
+## Implement callback function
+
+Notes:
+- Next, we have to implement the callback function.
+- We said that this callback function must return a `Promise` for a Javascript `Response` object.
+- That means that this callback function is asynchronous.
+- So we need to do two things: create and return a new `Promise`, and start a new goroutine that will be responsible for resolving this promise.
+- In fact, we can create the new goroutine inside of the callback we give to the `Promise` constructor.
+- Creating a new goroutine actually makes sense, because this is how a Go HTTP server usually works, it ceates a new goroutine for each request.
+- And this is it for the callback function, the rest of the work will be carried out by the new goroutine we started.
+
 ## Javascript Request to Go Request
+
+Notes:
+- Now the first thing we need to do in this new goroutine, is create an instance of a Go `http.Request`, from the Javascript `Request` object.
+- We could use the `NewRequest()` function from the `http` package, but if you read carefully the documentation, it says that this function is suitable only for outgoing requests, or client requests if you prefer.
+- However the `httptest` package has the same `NewRequest()` function, which creates requests suitable for passing to an HTTP handler.
+- So this is exactly what we want!
+- The `NewRequest()` function takes 3 parameters.
+- The first two parameters are the request method and URL, which we can simply read from the Javascript `Request` object's properties.
+- The third parameter is going to be a little bit trickier, it is an `io.Reader` for the request body.
+- How are we going to copy the raw binary data of the request body from Javascript to Go?
+- Luckily for us, the `syscall/js` package has `CopyBytesToGo()` function for that.
+- It takes a byte slice as destination, and a reference to a Javascript `Uint8Array` as source.
+- FIXME
+
+
+
+
+
+
+
+
+
+
+
 
 Notes:
 - FIXME
