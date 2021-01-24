@@ -86,7 +86,7 @@ Notes:
 
 ---
 
-## Build tags...
+## Adding js/wasm target
 
 Notes:
 - This is nice, because provided our handlers are wasm compatible, we can keep and reuse these as they are.
@@ -97,7 +97,20 @@ Notes:
 
 ---
 
-## FIXME
+## Implementing `Serve()`
+
+Notes:
+- Now let's dive in the implementation of this `Serve()` function.
+- It needs to receive the Javascript request objects, so from the Javascript point of view, the ServiceWorker needs to have some callback from the Webassembly binary, in order to give each `Request` object.
+- At the moment, Go Webassembly binaries have no way to export functions or other values.
+- So in order to work around this, the `Serve()` function will have to register a callback function with the ServiceWorker.
+- The `syscall/js` package allows to create such callback functions using `FuncOf()`.
+- Our callback function will have one request parameter of type `js.Value`.
+- And it will return one value, which will have to be a Javascript `Promise` for a Javascript `Response` object.
+- Then the `Serve` function can register the callback with the ServiceWorker, by calling a setter function previously declared in the ServiceWorker's global scope.
+- And this it, the ServiceWorker is now able to forward the FetchEvent's requests to the WebAssembly binary.
+
+## Javascript Request to Go Request
 
 Notes:
 - FIXME
