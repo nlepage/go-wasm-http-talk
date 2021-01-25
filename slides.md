@@ -15,6 +15,7 @@ css: assets/styles.css
 
 Notes:
 - Hi everybody, my name is Nicolas Lepage, I am a developer at Zenika IT in France. I work mainly with Javascript, and I also like experimenting with Go.
+- Also, I'm sorry in advance for my poor english.
 - So, today I am going to talk about, deploying a Go HTTP server in your browser.
 
 ## Why?
@@ -44,7 +45,7 @@ Notes:
 - One case is when it is intercepted by a service worker, which usually allows web applications to work offline.
 - Now I think you are starting to see where I am going with this.
 - The question is, would it be possible to execute a Go WebAssembly binary in a service worker and use it to handle HTTP requests?
-- Well, let's find out!
+- Let's find out!
 
 ---
 
@@ -52,7 +53,7 @@ Notes:
 
 Notes:
 - A little warning before we go any further.
-- When you are building to WebAssembly, you have to make sure all your code and dependencies are compatible.
+- When you are targetting WebAssembly, you have to make sure all the code you are trying to build is compatible.
 - This means for example that you cannot rely on C bindings, or system dependencies, or a database server.
 - That being said, today I'm going to focus on the HTTP side of things.
 
