@@ -110,6 +110,7 @@ Notes:
 - And it will return one value, which will have to be a Javascript `Promise` for a Javascript `Response` object.
 - Then the `Serve` function can register the callback with the ServiceWorker, by calling a setter function, which has to be previously declared in the ServiceWorker's global scope.
 - The ServiceWorker is now able to forward the FetchEvent's request to the WebAssembly binary.
+- From the ServiceWorker point of view, we just have to call the handler with the `FetchEvent`'s request, and directly give the return value to the `FetchEvent`'s `respondWith()` method.
 
 ## Implement callback function
 
@@ -153,4 +154,63 @@ Notes:
 ## Go response to Javascript Response
 
 Notes:
- - FIXME
+- In order to build a Javascript `Response` object, we can use the `Response` constructor which takes 2 parameters, the response body and an init object for additional information such as status and headers.
+- The first parameter accepts several types, one of them is `BufferSource`, actually this is not a real type but either an `ArrayBuffer` or a `TypedArray`.
+- `TypedArray` is fine for us, it will allow us to use the `CopyBytesToJS()` function from the `syscall/js` package, which works just like `CopyBytesToGo()` but in the opposite direction.
+- So we read all of the response body content into a bytes slice, then create a new `Uint8Array()` of the same length, and finally call `CopyBytesToJS()`.
+- In order to build the init object, we can use a map of string to empty interface, which the `syscall/js` will transform to a new Javascript object.
+- We only add two values, one for the response status code, and one for the headers, for which we can also use a map of string to empty interface.
+- And finally we can call the `Response` constructor, and the resolve function of the `Promise`.
+- And WE ARE DONE!
+- Now the question is, does this actually work?
+- Let's find out, with a first example.
+
+## Hello JSON service example
+
+Notes:
+- Our web page will of course register the service worker.
+- Then it will send a POST request to the hello service, with a JSON body containing only a name property.
+- And it expects a JSON response with a message property, displayed in an alert.
+- On the Go side, we only have one `HandleFunc`, which decodes the request body, then formats a hello message in the response body.
+- demo...
+
+## Catption example
+
+Notes:
+- Now let's come back to our very original example, which was the catption server.
+- The hello example only used the WebAssembly binary to generate a hello message.
+- But this time the WebAssembly binary will actually serve the HTML page containing the form.
+- So what we can do is create a small HTML file, which will only be responsible for registering the ServiceWorker.
+- Once the ServiceWorker is activated, it will trigger a reload of the same address, which will now be served from the WebAssembly binary.
+- Let's see if this works.
+- demo...
+
+## Stateless vs Statefull
+
+Notes:
+- So far, in the examples I have been using, the server is stateless.
+- This means it can be stopped and restarted as much as we want.
+- And this is actually a good thing, because the lifecycle of ServiceWorkers is event based.
+- The browser will start the ServiceWorker only when it is necessary, for example when a FetchEvent is received.
+- Then if no more events are received, after some time the browser may decide to stop the ServiceWorker.
+- So what happens if our server actually has some state?
+- To find out, we can take back our hello example and add a request counter at the end of the hello message.
+- The counter will be a simple integer variable, stored in memory.
+- And let's see what happens.
+- demo...
+- So how can we work around this? Well there is no real solution here.
+- The ServiceWorkers specification does not allow to keep a ServiceWorker alive if it has no clients.
+- This means we need at least one page to be loaded in the scope of the ServiceWorker, if we want to be able to keep it alive.
+- So the most we can do, is send periodic messages from the page to the ServiceWorker, in order to keep the browser from stopping the Service as long as the page is loaded.
+- In summary, it is not really possible to have a stateful server leaving in a ServiceWorker.
+- However, one could imagine serializing the state of the server and storing it in the browser's LocalStore or SessionStorage.
+
+## Conclusion
+
+Notes:
+- In conclusion, it is not actually possible to deploy a Go HTTP server in the browser, but it is possible to execute Go HTTP handlers.
+- Using build conditions allows to reuse most of the code we usually write for building a Go HTTP server.
+- However, building to WebAssembly requires our code to be compatible.
+- And finally, we saw that it is not possible to deploy a long-running stateful server in a ServiceWorker.
+- Thank you for listening, thank you to FOSDEM organizers, and to the Go devroom organizers.
+- More information is available on the github project, if you give it a try please let me know, I will be glad to have your feedback.
