@@ -14,16 +14,16 @@ css: assets/styles.css
 # Deploy a Go HTTP server in your browser
 
 Notes:
-- Hi everybody, my name is Nicolas Lepage, I am a developer at Zenika IT in France. I work mainly with Javascript, and I also like experimenting with Go.
-- Also, I'm sorry in advance for my poor english.
-- So, today I am going to talk about, deploying a Go HTTP server in your browser.
+- Hi everybody, my name is Nicolas Lepage, I am a developer at Zenika IT in France. I work a lot with Javascript, and I also like experimenting with Go.
+- I'm sorry in advance for my poor english, so please bear with me.
+- Today I am going to talk about, deploying a Go HTTP server in your browser.
 
 ---
 
 ## Why?
 
- - For demonstration purposes
- - Avoid deploying a server
+- For demonstration purposes
+- Avoid deploying a server
 
 Notes:
 - First, you may be wondering, why? Why would I want to do that?
@@ -69,6 +69,7 @@ Notes:
 - A little warning before we go any further.
 - When you are targetting WebAssembly, you have to make sure all the code you are trying to build is compatible.
 - This means for example that you cannot rely on C bindings, or system dependencies, or a database server.
+- Also you have to be carefull with Go's standard library, which for a large part can be built to WebAssembly, but will actually panic at runtime.
 - That being said, today I'm going to focus on the HTTP side of things.
 
 ---
@@ -92,7 +93,7 @@ FetchEvent {
 Notes:
 - First, let's have a quick look at how it is possible to respond to an HTTP request from a service worker.
 - When a service worker intercepts an HTTP request, it receives a `FetchEvent`.
-- The `FetchEvent` contains a `Request` object which holds all the information we need about the request (URL, method, headers), and also the body contents if any.
+- The `FetchEvent` contains a `Request` object which holds all the information we need about the request (method, headers), and also the body contents if any.
 - The `FetchEvent` also has a `respondWith()` method, which accepts one parameter of type `Response` or `Promise` for a `Response`.
 - So, by reading the `Request` object and building a `Response` object to give to `respondWith()`, we are able to respond to an HTTP request from a ServiceWorker.
 - However, what we want to do is delegate this task to a Go WebAssembly binary.
@@ -126,7 +127,7 @@ Notes:
 - We may also choose to define handlers using some third party libraries, such as `gorilla/mux`.
 - Then, once our handlers are defined, in most cases we will call `ListenAndServe()`, which will start listening for HTTP requests and use our handlers to respond to these.
 - In our case, we would like to reuse as much as possible of this code we wrote, but use it to respond to a request intercepted by a SW.
-- Provided the handlers are WebAssembly compatible, we can keep and reuse these as they are.
+- Provided the handlers are WebAssembly compatible, we can keep and reuse them as they are.
 - So this is nice, because the handlers are the main part of our code, this is where we declare all the logic.
 - Of course, the one thing we are not going to be able to reuse is the call to `ListenAndServe()`.
 - But, this is OK, because we are going to take a pretty radical shortcut.
@@ -179,8 +180,7 @@ func Serve(handler http.Handler) {
         // return a Promise for a Response
     })
 
-    var setCallback = js.Global().Get("setCallback") // Setter function
-    setCallback.Invoke(callback)
+    js.Global().Get("setGoCallback").Invoke(callback)
 }
 ```
 <!-- .element: style="font-size: 0.44em;" -->
@@ -202,11 +202,11 @@ Notes:
 
 📄 `sw.js`
 ```js
-let callback
-self.setCallback = v => { callback = v }
+let goCallback
+self.setGoCallback = v => { goCallback = v }
 
 self.addEventListener('fetch', e => {
-    e.respondWith(handlerPromise.then(handler => handler(e.request)))
+    e.respondWith(goCallback(e.request))
 })
 ```
 <!-- .element: style="font-size: 0.46em;" -->
@@ -265,8 +265,8 @@ func JSRequestToGoRequest(jsReq js.Value) http.Request {
 
 Notes:
 - Now the first thing we need to do in this new goroutine, is create an instance of a Go `http.Request`, from the Javascript `Request` object.
-- We could use the `NewRequest()` function from the `http` package, but if you read carefully the documentation, it says that this function is suitable only for outgoing requests, or client requests if you prefer.
-- However the `httptest` package has the same `NewRequest()` function, which creates requests suitable for passing to an HTTP handler.
+- We could use the `NewRequest()` function from the `http` package, but if you read carefully the documentation, it says that this function is suitable only for outgoing requests, but what we actually want is to emulate an incoming request.
+- Thankfully, the `httptest` package has the same `NewRequest()` function, which creates requests suitable for passing to an HTTP handler.
 - Usually this is usefull for testing purposes, but this is exactly what we want! So let's use this.
 - The `NewRequest()` function takes 3 parameters.
 - The first two parameters are the request method and URL, which we can simply read from the Javascript `Request` object's properties.
@@ -286,8 +286,8 @@ func CopyBytesToGo(dst []byte, src js.Value) int
 ```
 
 Notes:
-- Luckily for us, the `syscall/js` package has `CopyBytesToGo()` function for that.
-- It takes a bytes slice as destination, and a reference to a Javascript typed array of unsigned integers (`Uint8Array`) as source.
+- Luckily for us, the `syscall/js` package has a `CopyBytesToGo()` function just for that.
+- It takes a bytes slice as destination, and a reference to a Javascript typed array of unsigned 8 bit integers as source.
 - So this is OK, with just a few more plumbing we should be able to copy the body content from Javascript to Go.
 
 ---
@@ -313,7 +313,8 @@ func JSRequestToGoRequest(jsReq js.Value) http.Request {
 
 Notes:
 - We call the `arrayBuffer()` method of the Javascript `Request`, which returns a `Promise` for an `ArrayBuffer`, we wait for this `Promise` to be resolved, then we can wrap the `ArrayBuffer`, into an `Uint8Array`.
-- Now we have a Go request, the only important information missing, is the headers of the request.
+- Then we can just create a bytes slice of same length, and call `CopyBytesToGo()`. 
+- Now we have a Go request, the only important information missing on this request, is the headers.
 
 ---
 ## Copying headers
@@ -339,7 +340,7 @@ func JSRequestToGoRequest(jsReq js.Value) http.Request {
 
 Notes:
 - The headers are stored in a simple map of strings, both in Javascript and Go, so we just iterate over these and set each header on the Go `Request`.
-- And the Go `Request` is complete.
+- And the Go `Request` is now complete.
 
 ---
 
@@ -378,7 +379,7 @@ go func() {
 
 Notes:
 - So now we are able to call the `Handler`'s `ServerHTTP()` method.
-- Once the `Handler` returns, the last thing we have to do is read the result of the `ResponseRecorder`, which is an `http.Response` struct, and build a Javascript `Response` object from it.
+- Once the `Handler` returns, the last thing we have to do is read the result of the `ResponseRecorder`, which is an `http.Response` struct, and build a Javascript `Response` object from it, in other words the opposite of what we did with the request.
 
 ---
 
@@ -547,18 +548,22 @@ Notes:
 - However, one could imagine serializing the state of the server and storing it in the browser's LocalStorage or SessionStorage.
 
 ---
-## Conlusion
+## Conclusion
 
 Notes:
-- In conclusion, it is not really possible to deploy a Go HTTP server in a browser, but it is possible to execute Go HTTP handlers.
-- Using build conditions allows to reuse most of the code we usually write for building a Go HTTP server.
-- However, building to WebAssembly requires our code to be compatible.
-- And finally, we saw that it is not possible to deploy a long-running stateful server in a ServiceWorker.
+- In conclusion, as you would expect, it is not really possible to deploy a Go HTTP server in a browser, however it is possible to execute Go HTTP handlers in a ServiceWorker.
+- Using build conditions allows to reuse most of the code we usually write for building a Go HTTP server, but targetting WebAssembly requires this code to be compatible.
+- And finally, we saw that deploying a long-running stateful server in a ServiceWorker is not a good idea, because of the lifecycle of ServiceWorkers.
+
+---
+
+https://github.com/nlepage/go-wasm-http-server/
+
+Notes:
+FIXME
 
 ---
 ## Thank you
-
-https://github.com/nlepage/go-wasm-http-server/
 
 Notes:
 - Thank you for listening, thank you to FOSDEM organizers, and to the Go devroom organizers.
