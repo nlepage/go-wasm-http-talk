@@ -537,10 +537,8 @@ Notes:
 - This means it can be stopped and restarted as much as we want.
 - And this is actually a good thing, because the lifecycle of ServiceWorkers is event based.
 - The browser will start the ServiceWorker only when it is necessary, for example when a FetchEvent is received.
-- Then if no more events are received, after some time the browser may decide to stop the ServiceWorker.
-- So what happens if our server actually has some state?
-- To find out, we can take back our hello example and add a request counter at the end of the hello message.
-- demo...
+- Then if no more events are received, after some time the browser may decide to stop the ServiceWorker and kill the WebAssembly binary.
+- So if my server is stateful, the state will be lost.
 - So how can we work around this? Well there is no real solution here.
 - The ServiceWorkers specification does not allow to keep a ServiceWorker alive if it has no clients.
 - This means we need at least one page to be loaded in the scope of the ServiceWorker, if we want to be able to keep it alive.
@@ -560,5 +558,8 @@ Notes:
 ---
 ## Thank you
 
+https://github.com/nlepage/go-wasm-http-server/
+
+Notes:
 - Thank you for listening, thank you to FOSDEM organizers, and to the Go devroom organizers.
 - More information is available on the github project, if you give it a try please let me know, I will be glad to have your feedback.

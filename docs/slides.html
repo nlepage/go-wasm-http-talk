@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="./dist/reveal.css" />
     <link rel="stylesheet" href="./dist/theme/white.css" id="theme" />
     <link rel="stylesheet" href="./css/highlight/zenburn.css" />
-    <link rel="stylesheet" href="./_assets/styles.css" />
+    <link rel="stylesheet" href="./_assets/assets/styles.css" />
 
   </head>
   <body>
@@ -18,10 +18,558 @@
 
 # Deploy a Go HTTP server in your browser
 
-<aside class="notes"></aside></script></section><section data-markdown><script type="text/template">
+<aside class="notes"><ul>
+<li>Hi everybody, my name is Nicolas Lepage, I am a developer at Zenika IT in France. I work mainly with Javascript, and I also like experimenting with Go.</li>
+<li>Also, I&#39;m sorry in advance for my poor english.</li>
+<li>So, today I am going to talk about, deploying a Go HTTP server in your browser.</li>
+</ul>
+</aside></script></section><section data-markdown><script type="text/template">
 
-## Slide 2
-</script></section></section></div>
+## Why?
+
+ - For demonstration purposes
+ - Avoid deploying a server
+
+<aside class="notes"><ul>
+<li>First, you may be wondering, why? Why would I want to do that?</li>
+<li>Well it could be useful for demonstration puproses.</li>
+<li>I have this nice little Go project, it is a command line interface tool that helps me add a text at the bottom or at the top of a JPEG image.</li>
+<li>And it also has an http subcommand, which starts a little HTTP server, with just an HTML form where you can do the same.</li>
+<li>Now, I would like to put up a little demonstration server for my project.</li>
+<li>But I don&#39;t want to actually deploy a Go server for this.</li>
+<li>So that&#39;s how I started wondering if we could deploy a Go HTTP server in a browser.</li>
+</ul>
+</aside></script></section><section data-markdown><script type="text/template">
+
+## Build to WebAssembly
+
+- Since Go 1.11
+- May be executed in a browser
+- Has same limitations as JavaScript code
+
+<aside class="notes"><ul>
+<li>Since Go 1.11, running a program written in Go in a browser is possible, if you build it to WebAssembly.</li>
+<li>You get a WebAssembly binary which can be downloaded and executed by a browser.</li>
+<li>If you haven&#39;t heard about WebAssembly, it uses a portable bytecode format executable by browsers, and compiled from higher level languages such as Rust, C, C++, or Go.</li>
+<li>Of course, Go code executed in a browser has exactly the same limitations as any JavaScript code executed in the same browser.</li>
+<li>For example, it will not be able to use the <code>os</code> package to access the client&#39;s file system.</li>
+<li>So, it will also not be able to actually start an HTTP server in the browser.</li>
+<li>However, when an HTTP request is sent from a web page, there are some cases when it will not actually reach the server.</li>
+</ul>
+</aside></script></section><section data-markdown><script type="text/template">
+
+## ServiceWorkers
+
+<aside class="notes"><ul>
+<li>One case is when it is intercepted by a service worker, which usually allows web applications to work offline for example.</li>
+<li>Now I think you are starting to see where I am going with this.</li>
+<li>The question is, would it be possible to execute a Go WebAssembly binary in a service worker and use it to handle HTTP requests?</li>
+<li>Let&#39;s find out!</li>
+</ul>
+</aside></script></section><section data-markdown><script type="text/template">
+
+## Disclaimer
+
+<aside class="notes"><ul>
+<li>A little warning before we go any further.</li>
+<li>When you are targetting WebAssembly, you have to make sure all the code you are trying to build is compatible.</li>
+<li>This means for example that you cannot rely on C bindings, or system dependencies, or a database server.</li>
+<li>That being said, today I&#39;m going to focus on the HTTP side of things.</li>
+</ul>
+</aside></script></section><section data-markdown><script type="text/template">
+
+## Respond to HTTP requests from a ServiceWorker
+
+```js
+FetchEvent {
+    request: {
+        url: "http://example.com/",
+        method: "GET",
+        headers: {
+            "Accept": "text/html",
+        },
+        body: ...
+    },
+    respondWith(Response | Promise<Response>),
+}
+```
+
+<aside class="notes"><ul>
+<li>First, let&#39;s have a quick look at how it is possible to respond to an HTTP request from a service worker.</li>
+<li>When a service worker intercepts an HTTP request, it receives a <code>FetchEvent</code>.</li>
+<li>The <code>FetchEvent</code> contains a <code>Request</code> object which holds all the information we need about the request (URL, method, headers), and also the body contents if any.</li>
+<li>The <code>FetchEvent</code> also has a <code>respondWith()</code> method, which accepts one parameter of type <code>Response</code> or <code>Promise</code> for a <code>Response</code>.</li>
+<li>So, by reading the <code>Request</code> object and building a <code>Response</code> object to give to <code>respondWith()</code>, we are able to respond to an HTTP request from a ServiceWorker.</li>
+<li>However, what we want to do is delegate this task to a Go WebAssembly binary.</li>
+</ul>
+</aside></script></section><section data-markdown><script type="text/template">
+
+## Building a Go HTTP server
+
+```go
+http.Handler("/foo", fooHandler)
+
+http.HandleFunc("/bar", func(res http.ResponseWriter, req *http.Request) {
+    // handle bar request
+})
+
+r := mux.NewRouter() // gorilla/mux
+r.HandleFunc("/foo", handleFoo)
+r.HandleFunc("/bar", handleBar)
+
+http.ListenAndServe(":8080", nil) // use http.DefaultServeMux
+// or
+http.ListenAndServe(":8080", r) // use mux router
+```
+<!-- .element: style="font-size: 0.44em;" -->
+
+<aside class="notes"><ul>
+<li>Now let&#39;s take a step back and review how we usually build an HTTP server in Go.</li>
+<li>The most straightforward way is to use the <code>http</code> package.</li>
+<li>First we define HTTP handlers using <code>Handle()</code> which accepts a <code>Handler</code> or <code>HandleFunc()</code> which accepts a simple function.</li>
+<li>Indeed, handlers are simple functions which receive a <code>ResponseWriter</code> and a <code>Request</code>; so we can already see that this looks a lot like the service worker&#39;s <code>FetchEvent</code>.</li>
+<li>We may also choose to define handlers using some third party libraries, such as <code>gorilla/mux</code>.</li>
+<li>Then, once our handlers are defined, in most cases we will call <code>ListenAndServe()</code>, which will start listening for HTTP requests and use our handlers to respond to these.</li>
+<li>In our case, we would like to reuse as much as possible of this code we wrote, but use it to respond to a request intercepted by a SW.</li>
+<li>Provided the handlers are WebAssembly compatible, we can keep and reuse these as they are.</li>
+<li>So this is nice, because the handlers are the main part of our code, this is where we declare all the logic.</li>
+<li>Of course, the one thing we are not going to be able to reuse is the call to <code>ListenAndServe()</code>.</li>
+<li>But, this is OK, because we are going to take a pretty radical shortcut.</li>
+<li>Ususally when we call <code>ListenAndServe()</code>, it takes care of a lot of things for us under the hood, and for each request it calls the <code>Handler</code> if we gave one in parameter or <code>DefaultServeMux</code>, which is the default <code>Handler</code>.</li>
+<li>So, what we can actually do is, directly call the <code>ServeHTTP()</code> method of the <code>Handler</code> or of <code>DefaultServeMux</code>.</li>
+</ul>
+</aside></script></section><section data-markdown><script type="text/template">
+
+## Adding js/wasm target
+
+📄 `server.go`
+
+```go
+// +build !js,!wasm
+
+func startServer() {
+    http.ListenAndServe(":8080", handler)
+}
+```
+
+📄 `server_js_wasm.go`
+```go
+func startServer() {
+    wasmhttp.Serve(handler)
+}
+```
+
+<aside class="notes"><ul>
+<li>Now, ideally we still want to be able to build standard binaries of the server working for linux or mac OS for example, and also the WebAssembly binary.</li>
+<li>For this, we can move the <code>ListenAndServe()</code> call into its own file, and use build tags to tell the Go compiler that this file is not compatible with WebAssembly.</li>
+<li>Then we can create a specific file for WebAssembly, this time using the file naming convention instead of the build tags, to tell the compiler that this file is compatible only with WebAssembly.</li>
+<li>And in this file we are going to use our own API, which will probably look something like this, so a <code>wasmhttp.Serve()</code> function which needs only the <code>Handler</code> parameter.</li>
+</ul>
+</aside></script></section><section data-markdown><script type="text/template">
+
+## Implementing `Serve()`
+
+```go
+import (
+    "http"
+    "syscall/js"
+)
+
+func Serve(handler http.Handler) {
+    var callback = js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
+        var request = args[0]
+
+        // ...
+
+        // return a Promise for a Response
+    })
+
+    var setCallback = js.Global().Get("setCallback") // Setter function
+    setCallback.Invoke(callback)
+}
+```
+<!-- .element: style="font-size: 0.44em;" -->
+
+<aside class="notes"><ul>
+<li>Now let&#39;s dive in the implementation of this <code>Serve()</code> function.</li>
+<li>It needs to receive the Javascript request objects, so from the Javascript point of view, the ServiceWorker needs to call the Webassembly binary with each <code>Request</code> object.</li>
+<li>At the moment, Go Webassembly binaries have no way to export functions or other values to Javascript.</li>
+<li>So, in order to work around this, the <code>Serve()</code> function will have to give a callback function to the ServiceWorker.</li>
+<li>The <code>syscall/js</code> package allows to create such callback functions using <code>FuncOf()</code>.</li>
+<li><code>FuncOf()</code> takes a Go function, and creates a JavaScript function from it.</li>
+<li>Our callback function will have one request parameter of type <code>js.Value</code>, this type represents a Javascript value for Go.</li>
+<li>And it will return one value, which will have to be a Javascript <code>Promise</code> for a Javascript <code>Response</code> object.</li>
+<li>Then the <code>Serve</code> function can register the callback with the ServiceWorker, by calling a setter function, which has to be previously declared in the ServiceWorker&#39;s global scope.</li>
+</ul>
+</aside></script></section><section data-markdown><script type="text/template">
+
+## Sending requests to Go
+
+📄 `sw.js`
+```js
+let callback
+self.setCallback = v => { callback = v }
+
+self.addEventListener('fetch', e => {
+    e.respondWith(handlerPromise.then(handler => handler(e.request)))
+})
+```
+<!-- .element: style="font-size: 0.46em;" -->
+
+<aside class="notes"><ul>
+<li>The ServiceWorker is now able to forward the FetchEvent&#39;s request to the WebAssembly binary.</li>
+<li>From the ServiceWorker point of view, we just have to call the handler with the <code>FetchEvent</code>&#39;s request, and directly give the return value to the <code>FetchEvent</code>&#39;s <code>respondWith()</code> method.</li>
+<li>The actual code, is a little more complex, because we have to use a Promise for the callback, which is resolved by the <code>setCallback</code> function.</li>
+</ul>
+</aside></script></section><section data-markdown><script type="text/template">
+
+## Promise for a Response
+
+```go
+var callback = js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
+    var jsReq = args[0]
+
+    var resPromise = NewPromise(func(resolve func(interface{}), reject func(interface{})) {
+        go func() {
+            // ...
+
+            // resolve promise
+        }()
+    })
+
+    return resPromise
+}
+```
+<!-- .element: style="font-size: 0.36em;" -->
+
+<aside class="notes"><ul>
+<li>Next, on the Go side, we have to implement the callback function.</li>
+<li>We said that this callback function must return a <code>Promise</code> for a Javascript <code>Response</code> object.</li>
+<li>That means that this callback function is asynchronous.</li>
+<li>So we need to do two things: create and return a new <code>Promise</code>, and start a new goroutine that will be responsible for resolving this promise.</li>
+<li>In fact, we can create the new goroutine inside of the callback we give to the <code>Promise</code> constructor.</li>
+<li>Creating a new goroutine actually makes sense, because this is how a Go HTTP server usually works, it creates a new goroutine for each request.</li>
+<li>The <code>NewPromise</code> function I am using here is not part of the <code>syscall/js</code> package, it is just a utility function to ease the creation of a new JavaScript <code>Promise</code>, which can be a little cumbersome using <code>syscall/js</code>.</li>
+<li>And this is it for the callback function, the rest of the work will be done in the new goroutine.</li>
+</ul>
+</aside></script></section><section data-markdown><script type="text/template">
+
+## JS Request to Go Request
+
+```go
+func JSRequestToGoRequest(jsReq js.Value) http.Request {
+    req := httptest.NewRequest(
+        jsReq.Get("method").String(),
+		jsReq.Get("url").String(),
+		// body
+    )
+
+    // ...
+}
+```
+
+<aside class="notes"><ul>
+<li>Now the first thing we need to do in this new goroutine, is create an instance of a Go <code>http.Request</code>, from the Javascript <code>Request</code> object.</li>
+<li>We could use the <code>NewRequest()</code> function from the <code>http</code> package, but if you read carefully the documentation, it says that this function is suitable only for outgoing requests, or client requests if you prefer.</li>
+<li>However the <code>httptest</code> package has the same <code>NewRequest()</code> function, which creates requests suitable for passing to an HTTP handler.</li>
+<li>Usually this is usefull for testing purposes, but this is exactly what we want! So let&#39;s use this.</li>
+<li>The <code>NewRequest()</code> function takes 3 parameters.</li>
+<li>The first two parameters are the request method and URL, which we can simply read from the Javascript <code>Request</code> object&#39;s properties.</li>
+<li>The third parameter is going to be a little bit trickier, it is an <code>io.Reader</code> for the request body.</li>
+<li>How are we going to copy the binary data of the request body from Javascript to Go?</li>
+</ul>
+</aside></script></section><section data-markdown><script type="text/template">
+
+## CopyBytesToGo
+
+```go
+
+func CopyBytesToGo(dst []byte, src js.Value) int
+
+// src must be a Uint8Array
+
+```
+
+<aside class="notes"><ul>
+<li>Luckily for us, the <code>syscall/js</code> package has <code>CopyBytesToGo()</code> function for that.</li>
+<li>It takes a bytes slice as destination, and a reference to a Javascript typed array of unsigned integers (<code>Uint8Array</code>) as source.</li>
+<li>So this is OK, with just a few more plumbing we should be able to copy the body content from Javascript to Go.</li>
+</ul>
+</aside></script></section><section data-markdown><script type="text/template">
+
+## JS Request to Go Request
+
+```go
+func JSRequestToGoRequest(jsReq js.Value) http.Request {
+    arrayBuffer := Promise{jsReq.Call("arrayBuffer")}.Await()
+    jsBody := js.Global().Get("Uint8Array").New(arrayBuffer)
+	body := make([]byte, jsBody.Get("length").Int())
+	js.CopyBytesToGo(body, jsBody)
+
+    req := httptest.NewRequest(
+        jsReq.Get("method").String(),
+		jsReq.Get("url").String(),
+		bytes.NewBuffer(body),
+    )
+
+    // ...
+}
+```
+
+<aside class="notes"><ul>
+<li>We call the <code>arrayBuffer()</code> method of the Javascript <code>Request</code>, which returns a <code>Promise</code> for an <code>ArrayBuffer</code>, we wait for this <code>Promise</code> to be resolved, then we can wrap the <code>ArrayBuffer</code>, into an <code>Uint8Array</code>.</li>
+<li>Now we have a Go request, the only important information missing, is the headers of the request.</li>
+</ul>
+</aside></script></section><section data-markdown><script type="text/template">
+## Copying headers
+
+```go
+func JSRequestToGoRequest(jsReq js.Value) http.Request {
+    // ...
+
+    headersIt := jsReq.Get("headers").Call("entries")
+	for {
+		entry := headersIt.Call("next")
+		if entry.Get("done").Bool() {
+			break
+		}
+		v := entry.Get("value")
+		req.Header.Set(v.Index(0).String(), v.Index(1).String())
+	}
+
+	return req, nil
+}
+```
+<!-- .element: style="font-size: 0.48em;" -->
+
+<aside class="notes"><ul>
+<li>The headers are stored in a simple map of strings, both in Javascript and Go, so we just iterate over these and set each header on the Go <code>Request</code>.</li>
+<li>And the Go <code>Request</code> is complete.</li>
+</ul>
+</aside></script></section><section data-markdown><script type="text/template">
+
+## Calling the HTTP Handler
+
+```go
+go func() {
+    req := JSRequestToGoRequest(jsReq)
+
+    handler.ServeHTTP(/* ResponseWriter */, req)
+
+    // ...
+}()
+```
+
+<aside class="notes"><ul>
+<li>We are almost ready to call the <code>Handler</code>, we just need a value to act as <code>ResponseWriter</code>.</li>
+<li>For this, the <code>httptest</code> package has a <code>ResponseRecorder</code> type, which implements <code>ResponseWriter</code> and records the response.</li>
+</ul>
+</aside></script></section><section data-markdown><script type="text/template">
+
+## Calling the HTTP Handler
+
+```go
+go func() {
+    req := JSRequestToGoRequest(jsReq)
+    resRecorder := httptest.NewRecorder()
+
+    handler.ServeHTTP(resRecorder, req)
+
+    res := res.Result()
+
+    // ...
+}()
+```
+
+<aside class="notes"><ul>
+<li>So now we are able to call the <code>Handler</code>&#39;s <code>ServerHTTP()</code> method.</li>
+<li>Once the <code>Handler</code> returns, the last thing we have to do is read the result of the <code>ResponseRecorder</code>, which is an <code>http.Response</code> struct, and build a Javascript <code>Response</code> object from it.</li>
+</ul>
+</aside></script></section><section data-markdown><script type="text/template">
+
+## Go response to JS Response
+
+```go
+func GoResponseToJSResponse(res *http.Response) js.Value {
+    b, err := ioutil.ReadAll(res.Body)
+    if err != nil {
+        panic(err)
+    }
+    body := js.Global().Get("Uint8Array").New(len(b))
+    js.CopyBytesToJS(body, b)
+
+    var init = make(map[string]interface{})
+
+    init["status"] = res.StatusCode
+
+    var headers = make(map[string]interface{})
+    init["headers"] = headers
+
+	return js.Global().Get("Response").New(body, init)
+}
+```
+<!-- .element: style="font-size: 0.46em;" -->
+
+<aside class="notes"><ul>
+<li>In order to build a Javascript <code>Response</code> object, we can use the <code>Response</code> constructor which takes 2 parameters, the response body and an init object for additional information such as status and headers.</li>
+<li>The first parameter accepts several types, one of them is <code>BufferSource</code>, actually this is not a real type but either an <code>ArrayBuffer</code> or a <code>TypedArray</code>.</li>
+<li><code>TypedArray</code> is fine for us, it will allow us to use the <code>CopyBytesToJS()</code> function from the <code>syscall/js</code> package, which works just like <code>CopyBytesToGo()</code> but in the opposite direction.</li>
+<li>So we read all of the response body content into a bytes slice, then create a new <code>Uint8Array()</code> of the same length, and finally call <code>CopyBytesToJS()</code>.</li>
+<li>In order to build the init object, we can use a map of string to empty interface, which the <code>syscall/js</code> will transform to a new Javascript object.</li>
+<li>We only add two values, one for the response status code, and one for the headers, for which we can also use a map of string to empty interface.</li>
+<li>And finally we can call the <code>Response</code> constructor.</li>
+</ul>
+</aside></script></section><section data-markdown><script type="text/template">
+
+## Resolve Response Promise
+
+```go
+go func() {
+    req := JSRequestToGoRequest(jsReq)
+    resRecorder := httptest.NewRecorder()
+
+    handler.ServeHTTP(resRecorder, req)
+
+    res := res.Result()
+
+    jsRes := GoResponseToJSResponse(res)
+
+    resolve(jsRes)
+}()
+```
+
+<aside class="notes"><ul>
+<li>Back to the goroutine responsible for handling the request, we can finally resolve the Promise with the Javascript Response we just build.</li>
+<li>And WE ARE DONE!</li>
+<li>Now the question is, does this actually work?</li>
+<li>Let&#39;s find out, with a first example.</li>
+</ul>
+</aside></script></section><section data-markdown><script type="text/template">
+
+## JSON hello example
+
+```js
+navigator.serviceWorker.register('sw.js')
+
+async function hello() {
+    const name = document.querySelector("#name").value
+
+    const res = await fetch('hello', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name })
+    })
+
+    const { message } = await res.json()
+
+    alert(message)
+}
+```
+<!-- .element: style="font-size: 0.46em;" -->
+
+<aside class="notes"><ul>
+<li>So on a small web page, we register the service worker.</li>
+<li>Then we have hello function which sends a POST request to the &#39;hello&#39; URL, with a JSON body containing only a name property.</li>
+<li>And it expects a JSON response with a message property, displayed in an alert.</li>
+</ul>
+</aside></script></section><section data-markdown><script type="text/template">
+
+## JSON hello example
+
+```go
+http.HandleFunc("/hello", func(res http.ResponseWriter, req *http.Request) {
+    params := make(map[string]string)
+    if err := json.NewDecoder(req.Body).Decode(&params); err != nil {
+        panic(err)
+    }
+
+    res.Header().Add("Content-Type", "application/json")
+    if err := json.NewEncoder(res).Encode(map[string]string{
+        "message": fmt.Sprintf("Hello %s!", params["name"]),
+    }); err != nil {
+        panic(err)
+    }
+})
+
+wasmhttp.Serve(nil)
+```
+<!-- .element: style="font-size: 0.42em;" -->
+
+https://nlepage.github.io/go-wasm-http-server/hello/
+
+<aside class="notes"><ul>
+<li>On the Go side, we only have one <code>HandleFunc</code>, which decodes the request body, then formats a hello message in the response body.</li>
+<li>demo...</li>
+</ul>
+</aside></script></section><section data-markdown><script type="text/template">
+
+## Catption example
+
+```js
+navigator.serviceWorker.register('sw.js')
+    .then(reg => {
+        const serviceWorker = reg.installing ?? reg.waiting ?? reg.active
+        if (serviceWorker.state === 'activated') {
+            document.location.reload()
+        } else {
+            serviceWorker.addEventListener('statechange', e => {
+                if (e.target.state === 'activated') document.location.reload()
+            })
+        }
+    })
+```
+<!-- .element: style="font-size: 0.42em;" -->
+
+https://nlepage.github.io/catption/wasm/
+
+<aside class="notes"><ul>
+<li>Now let&#39;s come back to our original example, which was the catption server.</li>
+<li>The hello example only used the WebAssembly binary to exchange JSON messages.</li>
+<li>But this time the WebAssembly binary will actually serve the HTML page containing the form.</li>
+<li>So what we can do is create a small HTML file, which will only be responsible for registering the ServiceWorker.</li>
+<li>Once the ServiceWorker is activated, it will trigger a reload of the same address, which will now be served from the WebAssembly binary.</li>
+<li>Let&#39;s see if this works.</li>
+<li>demo...</li>
+</ul>
+</aside></script></section><section data-markdown><script type="text/template">
+
+## Stateless vs Statefull
+
+<aside class="notes"><ul>
+<li>So far, in the examples I have been using, the server is stateless.</li>
+<li>This means it can be stopped and restarted as much as we want.</li>
+<li>And this is actually a good thing, because the lifecycle of ServiceWorkers is event based.</li>
+<li>The browser will start the ServiceWorker only when it is necessary, for example when a FetchEvent is received.</li>
+<li>Then if no more events are received, after some time the browser may decide to stop the ServiceWorker and kill the WebAssembly binary.</li>
+<li>So if my server is stateful, the state will be lost.</li>
+<li>So how can we work around this? Well there is no real solution here.</li>
+<li>The ServiceWorkers specification does not allow to keep a ServiceWorker alive if it has no clients.</li>
+<li>This means we need at least one page to be loaded in the scope of the ServiceWorker, if we want to be able to keep it alive.</li>
+<li>So the most we can do, is send periodic messages from the page to the ServiceWorker, in order to keep the browser from stopping the ServiceWorker as long as the page is loaded.</li>
+<li>In summary, it is not really possible to have a stateful server leaving in a ServiceWorker.</li>
+<li>However, one could imagine serializing the state of the server and storing it in the browser&#39;s LocalStorage or SessionStorage.</li>
+</ul>
+</aside></script></section><section data-markdown><script type="text/template">
+## Conlusion
+
+<aside class="notes"><ul>
+<li>In conclusion, it is not really possible to deploy a Go HTTP server in a browser, but it is possible to execute Go HTTP handlers.</li>
+<li>Using build conditions allows to reuse most of the code we usually write for building a Go HTTP server.</li>
+<li>However, building to WebAssembly requires our code to be compatible.</li>
+<li>And finally, we saw that it is not possible to deploy a long-running stateful server in a ServiceWorker.</li>
+</ul>
+</aside></script></section><section data-markdown><script type="text/template">
+## Thank you
+
+https://github.com/nlepage/go-wasm-http-server/
+
+<aside class="notes"><ul>
+<li>Thank you for listening, thank you to FOSDEM organizers, and to the Go devroom organizers.</li>
+<li>More information is available on the github project, if you give it a try please let me know, I will be glad to have your feedback.</li>
+</ul>
+</aside></script></section></section></div>
     </div>
 
     <script src="./dist/reveal.js"></script>
