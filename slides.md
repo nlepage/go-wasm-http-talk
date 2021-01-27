@@ -15,7 +15,7 @@ css: assets/styles.css
 
 Notes:
 - Hi everybody, my name is Nicolas Lepage, I am a developer at Zenika IT in France. I work a lot with Javascript, and I also like experimenting with Go.
-- I'm sorry in advance for my poor english, so please bear with me.
+- This is my first talk in english, so dont be surprised, I am a little out of practice.
 - Today I am going to talk about, deploying a Go HTTP server in your browser.
 
 ---
@@ -531,7 +531,7 @@ Notes:
 
 ---
 
-## Stateless vs Statefull
+## Stateless vs Stateful
 
 Notes:
 - So far, in the examples I have been using, the server is stateless.

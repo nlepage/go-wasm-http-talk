@@ -1,1 +1,2 @@
 - zoom demos in browser
+- put a label for demo links
