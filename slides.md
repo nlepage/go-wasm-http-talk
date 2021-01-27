@@ -185,11 +185,45 @@ Notes:
 
 ---
 
-## Adding js/wasm target
+<!-- .slide: data-autoslide="100" -->
+
+---
+
+## Adding `js/wasm` target
+
+<!-- .slide: data-auto-animate -->
+
+Notes:
+- Now, ideally we still want to be able to build standard binaries of the server working for linux or mac OS for example, and also the WebAssembly binary.
+
+---
+
+## Adding `js/wasm` target
+
+<!-- .slide: data-auto-animate -->
 
 📄 `server.go`
 
-```go
+```go []
+// +build !js,!wasm
+
+func startServer() {
+    http.ListenAndServe(":8080", handler)
+}
+```
+
+Notes:
+- For this, we can move the `ListenAndServe()` call into its own file, and use build tags to tell the Go compiler that this file is not compatible with WebAssembly.
+
+---
+
+## Adding `js/wasm` target
+
+<!-- .slide: data-auto-animate -->
+
+📄 `server.go`
+
+```go []
 // +build !js,!wasm
 
 func startServer() {
@@ -198,23 +232,21 @@ func startServer() {
 ```
 
 📄 `server_js_wasm.go`
-```go
+```go []
 func startServer() {
     wasmhttp.Serve(handler)
 }
 ```
 
 Notes:
-- Now, ideally we still want to be able to build standard binaries of the server working for linux or mac OS for example, and also the WebAssembly binary.
-- For this, we can move the `ListenAndServe()` call into its own file, and use build tags to tell the Go compiler that this file is not compatible with WebAssembly.
 - Then we can create a specific file for WebAssembly, this time using the file naming convention instead of the build tags, to tell the compiler that this file is compatible only with WebAssembly.
 - And in this file we are going to use our own API, which will probably look something like this, so a `wasmhttp.Serve()` function which needs only the `Handler` parameter.
 
 ---
 
-## Implementing `Serve()`
+## Implementing `wasmhttp.Serve()`
 
-```go
+```go []
 import (
     "http"
     "syscall/js"
@@ -232,7 +264,7 @@ func Serve(handler http.Handler) {
     js.Global().Get("setGoCallback").Invoke(callback)
 }
 ```
-<!-- .element: style="font-size: 0.44em;" -->
+<!-- .element: style="font-size: 0.42em;" -->
 
 Notes:
 - Now let's dive in the implementation of this `Serve()` function.
