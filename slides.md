@@ -38,6 +38,8 @@ Notes:
 
 ## Build to WebAssembly
 
+![WebAssembly Logo](assets/webassembly.svg) <!-- .element: style="width: 300px;" -->
+
 - Since Go 1.11
 - May be executed in a browser
 - Has same limitations as JavaScript code
@@ -55,6 +57,8 @@ Notes:
 
 ## ServiceWorkers
 
+![ServiceWorkers schema](assets/service-workers.png) <!-- .element: style="width: 800px;" -->
+
 Notes:
 - One case is when it is intercepted by a service worker, which usually allows web applications to work offline for example.
 - Now I think you are starting to see where I am going with this.
@@ -63,7 +67,7 @@ Notes:
 
 ---
 
-## Disclaimer
+## ⚠️ Disclaimer ⚠️
 
 Notes:
 - A little warning before we go any further.
@@ -74,9 +78,21 @@ Notes:
 
 ---
 
-## Respond to HTTP requests from a ServiceWorker
+## Respond from a ServiceWorker
 
-```js
+<!-- .slide: data-auto-animate -->
+
+Notes:
+- First, let's have a quick look at how it is possible to respond to an HTTP request from a service worker.
+- When a service worker intercepts an HTTP request, it receives a `FetchEvent`.
+
+---
+
+## Respond from a ServiceWorker
+
+<!-- .slide: data-auto-animate -->
+
+```js [1,11|2-9|10|]
 FetchEvent {
     request: {
         url: "http://example.com/",
@@ -91,18 +107,56 @@ FetchEvent {
 ```
 
 Notes:
-- First, let's have a quick look at how it is possible to respond to an HTTP request from a service worker.
-- When a service worker intercepts an HTTP request, it receives a `FetchEvent`.
-- The `FetchEvent` contains a `Request` object which holds all the information we need about the request (method, headers), and also the body contents if any.
-- The `FetchEvent` also has a `respondWith()` method, which accepts one parameter of type `Response` or `Promise` for a `Response`.
-- So, by reading the `Request` object and building a `Response` object to give to `respondWith()`, we are able to respond to an HTTP request from a ServiceWorker.
+- The `FetchEvent` contains a `Request` object ▶️ which holds all the information we need about the request (method, headers), and also the body contents if any.
+- The `FetchEvent` also has a `respondWith()` method ▶️, which accepts one parameter of type `Response` or `Promise` for a `Response`.
+- ▶️ So, by reading the `Request` object and building a `Response` object to give to `respondWith()`, we are able to respond to an HTTP request from a ServiceWorker.
 - However, what we want to do is delegate this task to a Go WebAssembly binary.
+
+---
+
+<!-- .slide: data-autoslide="100" -->
 
 ---
 
 ## Building a Go HTTP server
 
-```go
+<!-- .slide: data-auto-animate -->
+
+Notes:
+- Now let's take a step back and review how we usually build an HTTP server in Go.
+- The most straightforward way is to use the `http` package.
+
+---
+
+## Building a Go HTTP server
+
+<!-- .slide: data-auto-animate -->
+
+```go [1-5|7-9]
+http.Handler("/foo", fooHandler)
+
+http.HandleFunc("/bar", func(res http.ResponseWriter, req *http.Request) {
+    // handle bar request
+})
+
+r := mux.NewRouter() // gorilla/mux
+r.HandleFunc("/foo", handleFoo)
+r.HandleFunc("/bar", handleBar)
+```
+<!-- .element: data-id="code" style="font-size: 0.42em;" -->
+
+Notes:
+- First we define HTTP handlers using `Handle()` which accepts a `Handler` or `HandleFunc()` which accepts a simple function.
+- Indeed, handlers are simple functions which receive a `ResponseWriter` and a `Request`; so we can already see that this looks a lot like the service worker's `FetchEvent`.
+- ▶️ We may also choose to define handlers using some third party libraries, such as `gorilla/mux`.
+
+---
+
+## Building a Go HTTP server
+
+<!-- .slide: data-auto-animate -->
+
+```go [11-13|]
 http.Handler("/foo", fooHandler)
 
 http.HandleFunc("/bar", func(res http.ResponseWriter, req *http.Request) {
@@ -117,14 +171,9 @@ http.ListenAndServe(":8080", nil) // use http.DefaultServeMux
 // or
 http.ListenAndServe(":8080", r) // use mux router
 ```
-<!-- .element: style="font-size: 0.44em;" -->
+<!-- .element: data-id="code" style="font-size: 0.42em; overflow: hidden;" -->
 
 Notes:
-- Now let's take a step back and review how we usually build an HTTP server in Go.
-- The most straightforward way is to use the `http` package.
-- First we define HTTP handlers using `Handle()` which accepts a `Handler` or `HandleFunc()` which accepts a simple function.
-- Indeed, handlers are simple functions which receive a `ResponseWriter` and a `Request`; so we can already see that this looks a lot like the service worker's `FetchEvent`.
-- We may also choose to define handlers using some third party libraries, such as `gorilla/mux`.
 - Then, once our handlers are defined, in most cases we will call `ListenAndServe()`, which will start listening for HTTP requests and use our handlers to respond to these.
 - In our case, we would like to reuse as much as possible of this code we wrote, but use it to respond to a request intercepted by a SW.
 - Provided the handlers are WebAssembly compatible, we can keep and reuse them as they are.
@@ -493,7 +542,7 @@ wasmhttp.Serve(nil)
 ```
 <!-- .element: style="font-size: 0.42em;" -->
 
-https://nlepage.github.io/go-wasm-http-server/hello/
+[![Demo link](assets/hang_glider_gopher_purple.png) <!-- .element: style="width: 200px;" -->](https://nlepage.github.io/go-wasm-http-server/hello/)
 
 Notes:
 - On the Go side, we only have one `HandleFunc`, which decodes the request body, then formats a hello message in the response body.
@@ -518,7 +567,7 @@ navigator.serviceWorker.register('sw.js')
 ```
 <!-- .element: style="font-size: 0.42em;" -->
 
-https://nlepage.github.io/catption/wasm/
+[![Demo link](assets/slide_gopher_blue.png) <!-- .element: style="width: 200px;" -->](https://nlepage.github.io/catption/wasm/)
 
 Notes:
 - Now let's come back to our original example, which was the catption server.
