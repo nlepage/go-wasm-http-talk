@@ -244,9 +244,64 @@ Notes:
 
 ---
 
+<!-- .slide: data-autoslide="100" -->
+
+---
+
 ## Implementing `wasmhttp.Serve()`
 
+<!-- .slide: data-auto-animate -->
+
 ```go []
+import (
+    "http"
+)
+
+func Serve(handler http.Handler) {
+
+}
+```
+<!-- .element: data-id="code" style="font-size: 0.42em;" -->
+
+Notes:
+- Now let's dive in the implementation of this `Serve()` function.
+- It needs to receive the Javascript request objects, so from the Javascript point of view, the ServiceWorker needs to call the Webassembly binary with each `Request` object.
+- At the moment, Go Webassembly binaries have no way to export functions or other values to Javascript.
+- So, in order to work around this, the `Serve()` function will have to give a callback function to the ServiceWorker.
+
+---
+
+## Implementing `wasmhttp.Serve()`
+
+<!-- .slide: data-auto-animate -->
+
+```go []
+import (
+    "http"
+    "syscall/js"
+)
+
+func Serve(handler http.Handler) {
+    var callback = js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
+
+    })
+}
+```
+<!-- .element: data-id="code" style="font-size: 0.42em;" -->
+
+Notes:
+- The `syscall/js` package allows to create such callback functions using `FuncOf()`.
+- `FuncOf()` takes a Go function, and creates a JavaScript function from it.
+- The `js.Value` type represents a Javascript value for Go.
+- The first underscored parameter is the `this` value of the Javascript function, which isn't useful for us.
+
+---
+
+## Implementing `wasmhttp.Serve()`
+
+<!-- .slide: data-auto-animate -->
+
+```go [8-12]
 import (
     "http"
     "syscall/js"
@@ -258,23 +313,43 @@ func Serve(handler http.Handler) {
 
         // ...
 
-        // return a Promise for a Response
+        // FIXME: return a Promise for a Response
+    })
+}
+```
+<!-- .element: data-id="code" style="font-size: 0.42em;" -->
+
+Notes:
+- Our callback function will have one request parameter of type `js.Value`, this type represents a Javascript value for Go.
+- And it will return one value, which will have to be a Javascript `Promise` for a Javascript `Response` object.
+
+---
+
+## Implementing `wasmhttp.Serve()`
+
+<!-- .slide: data-auto-animate -->
+
+```go [15]
+import (
+    "http"
+    "syscall/js"
+)
+
+func Serve(handler http.Handler) {
+    var callback = js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
+        var request = args[0]
+
+        // ...
+
+        // FIXME: return a Promise for a Response
     })
 
     js.Global().Get("setGoCallback").Invoke(callback)
 }
 ```
-<!-- .element: style="font-size: 0.42em;" -->
+<!-- .element: data-id="code" style="font-size: 0.42em;" -->
 
 Notes:
-- Now let's dive in the implementation of this `Serve()` function.
-- It needs to receive the Javascript request objects, so from the Javascript point of view, the ServiceWorker needs to call the Webassembly binary with each `Request` object.
-- At the moment, Go Webassembly binaries have no way to export functions or other values to Javascript.
-- So, in order to work around this, the `Serve()` function will have to give a callback function to the ServiceWorker.
-- The `syscall/js` package allows to create such callback functions using `FuncOf()`.
-- `FuncOf()` takes a Go function, and creates a JavaScript function from it.
-- Our callback function will have one request parameter of type `js.Value`, this type represents a Javascript value for Go.
-- And it will return one value, which will have to be a Javascript `Promise` for a Javascript `Response` object.
 - Then the `Serve` function can register the callback with the ServiceWorker, by calling a setter function, which has to be previously declared in the ServiceWorker's global scope.
 
 ---
@@ -282,9 +357,11 @@ Notes:
 ## Sending requests to Go
 
 📄 `sw.js`
-```js
+```js [|6-8|]
 let goCallback
-self.setGoCallback = v => { goCallback = v }
+self.setGoCallback = v => {
+    goCallback = v
+}
 
 self.addEventListener('fetch', e => {
     e.respondWith(goCallback(e.request))
@@ -293,9 +370,10 @@ self.addEventListener('fetch', e => {
 <!-- .element: style="font-size: 0.46em;" -->
 
 Notes:
-- The ServiceWorker is now able to forward the FetchEvent's request to the WebAssembly binary.
-- From the ServiceWorker point of view, we just have to call the handler with the `FetchEvent`'s request, and directly give the return value to the `FetchEvent`'s `respondWith()` method.
-- The actual code, is a little more complex, because we have to use a Promise for the callback, which is resolved by the `setCallback` function.
+- From the ServiceWorker's point of view, we are now able to forward the FetchEvent's request to the WebAssembly binary.
+- ▶️ In the event handler, we just have to call the callback function with the `FetchEvent`'s request, and directly give the return value to the `FetchEvent`'s `respondWith()` method.
+- ▶️ The `self` variable is a reference to the ServiceWorker's global scope, so this is handy for making the `setGoCallback()` function available for WebAssembly the binary.
+- The actual code is a little more complex, because we have to use a Promise for the callback, otherwise a FetchEvent might occur before the callback is defined.
 
 ---
 
@@ -319,7 +397,7 @@ var callback = js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
 <!-- .element: style="font-size: 0.36em;" -->
 
 Notes:
-- Next, on the Go side, we have to implement the callback function.
+- Next, on the Go side, let's focus on implementing this callback function.
 - We said that this callback function must return a `Promise` for a Javascript `Response` object.
 - That means that this callback function is asynchronous.
 - So we need to do two things: create and return a new `Promise`, and start a new goroutine that will be responsible for resolving this promise.
