@@ -114,7 +114,7 @@ Notes:
 
 ---
 
-<!-- .slide: data-autoslide="100" -->
+<!-- .slide: data-autoslide="1" -->
 
 ---
 
@@ -185,7 +185,7 @@ Notes:
 
 ---
 
-<!-- .slide: data-autoslide="100" -->
+<!-- .slide: data-autoslide="1" -->
 
 ---
 
@@ -244,7 +244,7 @@ Notes:
 
 ---
 
-<!-- .slide: data-autoslide="100" -->
+<!-- .slide: data-autoslide="1" -->
 
 ---
 
@@ -282,7 +282,7 @@ import (
 )
 
 func Serve(handler http.Handler) {
-    var callback = js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
+    callback := js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
 
     })
 }
@@ -308,8 +308,8 @@ import (
 )
 
 func Serve(handler http.Handler) {
-    var callback = js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
-        var jsReq = args[0]
+    callback := js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
+        jsReq := args[0]
 
         // FIXME: return a Promise for a Response
     })
@@ -334,8 +334,8 @@ import (
 )
 
 func Serve(handler http.Handler) {
-    var callback = js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
-        var jsReq = args[0]
+    callback := js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
+        jsReq := args[0]
 
         // FIXME: return a Promise for a Response
     })
@@ -373,13 +373,13 @@ Notes:
 
 ---
 
-## Promise for a Response
+## `Promise` for a `Response`
 
 <!-- .slide: data-auto-animate -->
 
 ```go []
-var callback = js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
-    var jsReq = args[0]
+callback := js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
+    jsReq := args[0]
 
     // FIXME: return a Promise for a Response
 })
@@ -392,17 +392,17 @@ Notes:
 
 ---
 
-## Promise for a Response
+## `Promise` for a `Response`
 
 <!-- .slide: data-auto-animate -->
 
 ```go [4-8]
-var callback = js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
-    var jsReq = args[0]
+callback := js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
+    jsReq := args[0]
 
-    var resPromise, resolve, reject = NewPromise()
+    resPromise, resolve, reject := NewPromise()
 
-    // FIXME resolve Promise
+    // FIXME resolve Response Promise
 
     return resPromise
 }
@@ -416,18 +416,18 @@ Notes:
 
 ---
 
-## Promise for a Response
+## `Promise` for a `Response`
 
 <!-- .slide: data-auto-animate -->
 
 ```go [6-8]
-var callback = js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
-    var jsReq = args[0]
+callback := js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
+    jsReq := args[0]
 
-    var resPromise, resolve, reject = NewPromise()
+    resPromise, resolve, reject := NewPromise()
 
     go func() {
-        // FIXME resolve Promise
+        // FIXME resolve Response Promise
     }()
 
     return resPromise
@@ -442,23 +442,54 @@ Notes:
 
 ---
 
+<!-- .slide: data-autoslide="1" -->
+
+---
+
 ## JS Request to Go Request
 
-```go
-func JSRequestToGoRequest(jsReq js.Value) http.Request {
-    req := httptest.NewRequest(
-        jsReq.Get("method").String(),
-		jsReq.Get("url").String(),
-		// body
-    )
+<!-- .slide: data-auto-animate -->
 
-    // ...
+```go []
+import (
+    "net/http"
+    "syscall/js"
+)
+
+func JSRequestToGoRequest(jsReq js.Value) http.Request {
+    
 }
 ```
+<!-- .element: data-id="code" -->
 
 Notes:
 - Now the first thing we need to do in this new goroutine, is create an instance of a Go `http.Request`, from the Javascript `Request` object.
 - We could use the `NewRequest()` function from the `http` package, but if you read carefully the documentation, it says that this function is suitable only for outgoing requests, but what we actually want is to emulate an incoming request.
+
+---
+
+## JS Request to Go Request
+
+<!-- .slide: data-auto-animate -->
+
+```go []
+import (
+    "net/http"
+    "net/http/httptest"
+    "syscall/js"
+)
+
+func JSRequestToGoRequest(jsReq js.Value) http.Request {
+    req := httptest.NewRequest(
+        jsReq.Get("method").String(),
+		jsReq.Get("url").String(),
+		// body io.Reader
+    )
+}
+```
+<!-- .element: data-id="code" -->
+
+Notes:
 - Thankfully, the `httptest` package has the same `NewRequest()` function, which creates requests suitable for passing to an HTTP handler.
 - Usually this is usefull for testing purposes, but this is exactly what we want! So let's use this.
 - The `NewRequest()` function takes 3 parameters.
@@ -468,10 +499,9 @@ Notes:
 
 ---
 
-## CopyBytesToGo
+## `CopyBytesToGo`
 
 ```go
-
 func CopyBytesToGo(dst []byte, src js.Value) int
 
 // src must be a Uint8Array
@@ -479,7 +509,7 @@ func CopyBytesToGo(dst []byte, src js.Value) int
 ```
 
 Notes:
-- Luckily for us, the `syscall/js` package has a `CopyBytesToGo()` function just for that.
+- Luckily for us, the `syscall/js` package has a `CopyBytesToGo()` function, just for that.
 - It takes a bytes slice as destination, and a reference to a Javascript typed array of unsigned 8 bit integers as source.
 - So this is OK, with just a few more plumbing we should be able to copy the body content from Javascript to Go.
 
@@ -487,32 +517,37 @@ Notes:
 
 ## JS Request to Go Request
 
-```go
+<!-- .slide: data-auto-animate -->
+
+```go [1,2,12|1,3,12|1,4-5,12|1,7-11,12]
 func JSRequestToGoRequest(jsReq js.Value) http.Request {
-    arrayBuffer := Promise{jsReq.Call("arrayBuffer")}.Await()
+    arrayBuffer := Await(jsReq.Call("arrayBuffer"))
     jsBody := js.Global().Get("Uint8Array").New(arrayBuffer)
 	body := make([]byte, jsBody.Get("length").Int())
-	js.CopyBytesToGo(body, jsBody)
-
+    js.CopyBytesToGo(body, jsBody)
+    
     req := httptest.NewRequest(
         jsReq.Get("method").String(),
 		jsReq.Get("url").String(),
 		bytes.NewBuffer(body),
     )
-
-    // ...
 }
 ```
+<!-- .element: data-id="code" style="font-size: 0.46em;" -->
 
 Notes:
-- We call the `arrayBuffer()` method of the Javascript `Request`, which returns a `Promise` for an `ArrayBuffer`, we wait for this `Promise` to be resolved, then we can wrap the `ArrayBuffer`, into an `Uint8Array`.
-- Then we can just create a bytes slice of same length, and call `CopyBytesToGo()`. 
+- We call the `arrayBuffer()` method of the Javascript `Request`, which returns a `Promise` for an `ArrayBuffer`
+- We wait for this `Promise` to be resolved, ▶ then we can wrap the `ArrayBuffer`, into an `Uint8Array`.
+- ▶ Now we can just create a bytes slice of the same length, and finally call `CopyBytesToGo()`.
+- A bytes buffer will do just fine for the body parameter of `NewRequest()`.
 - Now we have a Go request, the only important information missing on this request, is the headers.
 
 ---
-## Copying headers
+## JS Request to Go Request
 
-```go
+<!-- .slide: data-auto-animate -->
+
+```go []
 func JSRequestToGoRequest(jsReq js.Value) http.Request {
     // ...
 
@@ -526,10 +561,10 @@ func JSRequestToGoRequest(jsReq js.Value) http.Request {
 		req.Header.Set(v.Index(0).String(), v.Index(1).String())
 	}
 
-	return req, nil
+	return req
 }
 ```
-<!-- .element: style="font-size: 0.48em;" -->
+<!-- .element: data-id="code" style="font-size: 0.46em;" -->
 
 Notes:
 - The headers are stored in a simple map of strings, both in Javascript and Go, so we just iterate over these and set each header on the Go `Request`.
@@ -537,46 +572,55 @@ Notes:
 
 ---
 
+<!-- .slide: data-autoslide="1" -->
+
+---
+
 ## Calling the HTTP Handler
 
-```go
+<!-- .slide: data-auto-animate -->
+
+```go []
 go func() {
-    req := JSRequestToGoRequest(jsReq)
+    handler.ServeHTTP(/* ResponseWriter */, JSRequestToGoRequest(jsReq))
 
-    handler.ServeHTTP(/* ResponseWriter */, req)
-
-    // ...
+    // FIXME resolve Response Promise
 }()
 ```
+<!-- .element: data-id="code" style="font-size: 0.44em;" -->
 
 Notes:
 - We are almost ready to call the `Handler`, we just need a value to act as `ResponseWriter`.
-- For this, the `httptest` package has a `ResponseRecorder` type, which implements `ResponseWriter` and records the response.
 
 ---
 
 ## Calling the HTTP Handler
 
-```go
+<!-- .slide: data-auto-animate -->
+
+```go []
 go func() {
-    req := JSRequestToGoRequest(jsReq)
     resRecorder := httptest.NewRecorder()
 
-    handler.ServeHTTP(resRecorder, req)
+    handler.ServeHTTP(resRecorder, JSRequestToGoRequest(jsReq))
 
-    res := res.Result()
+    res := resRecorder.Result()
 
-    // ...
+    // FIXME resolve Response Promise
 }()
 ```
+<!-- .element: data-id="code" style="font-size: 0.44em;" -->
 
 Notes:
-- So now we are able to call the `Handler`'s `ServerHTTP()` method.
-- Once the `Handler` returns, the last thing we have to do is read the result of the `ResponseRecorder`, which is an `http.Response` struct, and build a Javascript `Response` object from it, in other words the opposite of what we did with the request.
+- For this, we can use the `ResponseRecorder` type from the `httptest` package, which implements `ResponseWriter` and records the response.
+- And now we are able to call the `Handler`'s `ServerHTTP()` method.
+- Once the `Handler` returns, the `Result()` method of the `ResponseRecorder` allows us to get the HTTP response written by the handler.
+- We are almost done!
+- The last thing we need to do is build a Javascript `Response` object from the Go response, in other words the opposite of what we did with the request.
 
 ---
 
-## Go response to JS Response
+## Go Response to JS Response
 
 ```go
 func GoResponseToJSResponse(res *http.Response) js.Value {
@@ -587,11 +631,11 @@ func GoResponseToJSResponse(res *http.Response) js.Value {
     body := js.Global().Get("Uint8Array").New(len(b))
     js.CopyBytesToJS(body, b)
 
-    var init = make(map[string]interface{})
+    init := make(map[string]interface{})
 
     init["status"] = res.StatusCode
 
-    var headers = make(map[string]interface{})
+    headers := make(map[string]interface{})
     init["headers"] = headers
 
 	return js.Global().Get("Response").New(body, init)
