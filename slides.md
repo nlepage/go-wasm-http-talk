@@ -301,7 +301,7 @@ Notes:
 
 <!-- .slide: data-auto-animate -->
 
-```go [8-12]
+```go [8-10]
 import (
     "http"
     "syscall/js"
@@ -309,9 +309,7 @@ import (
 
 func Serve(handler http.Handler) {
     var callback = js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
-        var request = args[0]
-
-        // ...
+        var jsReq = args[0]
 
         // FIXME: return a Promise for a Response
     })
@@ -329,7 +327,7 @@ Notes:
 
 <!-- .slide: data-auto-animate -->
 
-```go [15]
+```go [13]
 import (
     "http"
     "syscall/js"
@@ -337,9 +335,7 @@ import (
 
 func Serve(handler http.Handler) {
     var callback = js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
-        var request = args[0]
-
-        // ...
+        var jsReq = args[0]
 
         // FIXME: return a Promise for a Response
     })
@@ -372,38 +368,76 @@ self.addEventListener('fetch', e => {
 Notes:
 - From the ServiceWorker's point of view, we are now able to forward the FetchEvent's request to the WebAssembly binary.
 - ▶️ In the event handler, we just have to call the callback function with the `FetchEvent`'s request, and directly give the return value to the `FetchEvent`'s `respondWith()` method.
-- ▶️ The `self` variable is a reference to the ServiceWorker's global scope, so this is handy for making the `setGoCallback()` function available for WebAssembly the binary.
+- ▶ The `self` variable is a reference to the ServiceWorker's global scope, so this is handy for making the `setGoCallback()` function available for WebAssembly the binary.
 - The actual code is a little more complex, because we have to use a Promise for the callback, otherwise a FetchEvent might occur before the callback is defined.
 
 ---
 
 ## Promise for a Response
 
-```go
+<!-- .slide: data-auto-animate -->
+
+```go []
 var callback = js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
     var jsReq = args[0]
 
-    var resPromise = NewPromise(func(resolve func(interface{}), reject func(interface{})) {
-        go func() {
-            // ...
+    // FIXME: return a Promise for a Response
+})
+```
+<!-- .element: data-id="code" style="font-size: 0.42em;" -->
 
-            // resolve promise
-        }()
-    })
+Notes:
+- Next on the Go side, let's focus on implementing this callback function.
+- We said that this callback function must return a `Promise` for a Javascript `Response` object.
+
+---
+
+## Promise for a Response
+
+<!-- .slide: data-auto-animate -->
+
+```go [4-8]
+var callback = js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
+    var jsReq = args[0]
+
+    var resPromise, resolve, reject = NewPromise()
+
+    // FIXME resolve Promise
 
     return resPromise
 }
 ```
-<!-- .element: style="font-size: 0.36em;" -->
+<!-- .element: data-id="code" style="font-size: 0.42em;" -->
 
 Notes:
-- Next, on the Go side, let's focus on implementing this callback function.
-- We said that this callback function must return a `Promise` for a Javascript `Response` object.
-- That means that this callback function is asynchronous.
-- So we need to do two things: create and return a new `Promise`, and start a new goroutine that will be responsible for resolving this promise.
-- In fact, we can create the new goroutine inside of the callback we give to the `Promise` constructor.
-- Creating a new goroutine actually makes sense, because this is how a Go HTTP server usually works, it creates a new goroutine for each request.
+- So let's create a new `Promise`, and return it.
 - The `NewPromise` function I am using here is not part of the `syscall/js` package, it is just a utility function to ease the creation of a new JavaScript `Promise`, which can be a little cumbersome using `syscall/js`.
+- Returning a promise means the callback function is asynchronous, so we need to start a new goroutine...
+
+---
+
+## Promise for a Response
+
+<!-- .slide: data-auto-animate -->
+
+```go [6-8]
+var callback = js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
+    var jsReq = args[0]
+
+    var resPromise, resolve, reject = NewPromise()
+
+    go func() {
+        // FIXME resolve Promise
+    }()
+
+    return resPromise
+}
+```
+<!-- .element: data-id="code" style="font-size: 0.42em;" -->
+
+Notes:
+- ...otherwise the ServiceWorker would be blocked.
+- And starting a new goroutine actually makes sense, because this is how a Go HTTP server usually works, it starts a new goroutine for each request.
 - And this is it for the callback function, the rest of the work will be done in the new goroutine.
 
 ---
