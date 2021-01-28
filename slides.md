@@ -790,61 +790,53 @@ Notes:
 
 ## JSON hello example
 
-FIXME replace by diagram, but keep next slide
-
-```js
-navigator.serviceWorker.register('sw.js')
-
-async function hello() {
-    const name = document.querySelector("#name").value
-
-    const res = await fetch('hello', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ name })
-    })
-
-    const { message } = await res.json()
-
-    alert(message)
-}
-```
-<!-- .element: style="font-size: 0.46em;" -->
+![Hello example diagram](assets/hello.png)
 
 Notes:
-- So on a small web page, we register the service worker.
-- Then we have hello function which sends a POST request to the 'hello' URL, with a JSON body containing only a name property.
-- And it expects a JSON response with a message property, displayed in an alert.
+- We have a small index.html page, which sends a POST request to /api/hello, with a JSON body containing a name property.
+- This request should be handled by the api WebAssembly binary, which must return a JSON response with a message property.
+- And this message will be displayed in an alert
 
 ---
 
 ## JSON hello example
 
-FIXME put all the code and highlight ?
+```go [|12-24|26-27]
+package main
 
-```go
-http.HandleFunc("/hello", func(res http.ResponseWriter, req *http.Request) {
-    params := make(map[string]string)
-    if err := json.NewDecoder(req.Body).Decode(&params); err != nil {
-        panic(err)
-    }
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
 
-    res.Header().Add("Content-Type", "application/json")
-    if err := json.NewEncoder(res).Encode(map[string]string{
-        "message": fmt.Sprintf("Hello %s!", params["name"]),
-    }); err != nil {
-        panic(err)
-    }
-})
+	wasmhttp "github.com/nlepage/go-wasm-http-server"
+)
 
-wasmhttp.Serve(nil)
+func main() {
+	http.HandleFunc("/hello", func(res http.ResponseWriter, req *http.Request) {
+		params := make(map[string]string)
+		if err := json.NewDecoder(req.Body).Decode(&params); err != nil {
+			panic(err)
+		}
+
+		res.Header().Add("Content-Type", "application/json")
+		if err := json.NewEncoder(res).Encode(map[string]string{
+			"message": fmt.Sprintf("Hello %s!", params["name"]),
+		}); err != nil {
+			panic(err)
+		}
+	})
+
+	wasmhttp.Serve(nil)
+	select {} // block the main goroutine
+}
 ```
-<!-- .element: style="font-size: 0.42em;" -->
+<!-- .element: style="font-size: 0.28em;" -->
 
 Notes:
-- On the Go side, we only have one `HandleFunc`, which decodes the request body, then formats a hello message in the response body.
+- On the Go side, ▶️ we only have one `HandleFunc`, which decodes the request body, then formats a hello message in the response body.
+- ▶️ And of course the call to `wasmhttp.Serve()`.
+- We must also add something to block the main goroutine, here I used an empty select, which is not pretty, but works.
 
 ---
 
@@ -859,35 +851,30 @@ Notes:
 
 ---
 
-## Catption example
+## 😺 Catption example
 
-FIXME replace with a diagram
-
-```js
-navigator.serviceWorker.register('sw.js')
-    .then(reg => {
-        const serviceWorker = reg.installing ?? reg.waiting ?? reg.active
-        if (serviceWorker.state === 'activated') {
-            document.location.reload()
-        } else {
-            serviceWorker.addEventListener('statechange', e => {
-                if (e.target.state === 'activated') document.location.reload()
-            })
-        }
-    })
-```
-<!-- .element: style="font-size: 0.42em;" -->
+<!-- .slide: data-auto-animate -->
 
 Notes:
 - Now let's come back to my little project, which was the catption server.
 - The hello example only used the WebAssembly binary to exchange JSON messages.
 - But this time the WebAssembly binary will actually serve the HTML page containing the form.
+
+---
+
+## 😺 Catption example
+
+<!-- .slide: data-auto-animate -->
+
+![Hello example diagram](assets/catption.png)
+
+Notes:
 - So what we can do is create a small HTML file, which will only be responsible for registering the ServiceWorker.
 - Once the ServiceWorker is activated, it will trigger a reload of the same address, which will now be served from the WebAssembly binary.
 
 ---
 
-## Catption example
+## 😺 Catption example
 
 👇 Click the gopher! 👇
 
@@ -902,7 +889,7 @@ Notes:
 
 Notes:
 - So far, in the examples I have been using, the server is stateless.
-- This means it can be stopped and restarted as much as we want.
+- 🖵 This means it can be stopped and restarted as much as we want.
 - And this is actually a good thing, because the lifecycle of ServiceWorkers is event based.
 - The browser will start the ServiceWorker only when it is necessary, for example when a FetchEvent is received.
 - Then if no more events are received, after some time the browser may decide to stop the ServiceWorker and kill the WebAssembly binary.
