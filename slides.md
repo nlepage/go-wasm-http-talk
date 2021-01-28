@@ -620,9 +620,36 @@ Notes:
 
 ---
 
+<!-- .slide: data-autoslide="1" -->
+
+---
+
 ## Go Response to JS Response
 
-```go
+<!-- .slide: data-auto-animate -->
+
+```go []
+func GoResponseToJSResponse(res *http.Response) js.Value {
+	return js.Global().Get("Response").New(
+        // body BufferSource = ArrayBuffer | TypedArray
+        // init Object
+    )
+}
+```
+<!-- .element: data-id="code" style="font-size: 0.38em;" -->
+
+Notes:
+- In order to build a Javascript `Response` object, we can use the `Response` constructor which takes 2 parameters, the response body and an init object for additional information such as status code and headers.
+- The first parameter accepts several types, one of them is `BufferSource`, actually this is not a real type but either an `ArrayBuffer` or a `TypedArray`.
+- `TypedArray` is fine for us, it will allow us to use the `CopyBytesToJS()` function from the `syscall/js` package, which works just like `CopyBytesToGo()` but in the opposite direction.
+
+---
+
+## Go Response to JS Response
+
+<!-- .slide: data-auto-animate -->
+
+```go [1,2-5,13|1,6-12,13]
 func GoResponseToJSResponse(res *http.Response) js.Value {
     b, err := ioutil.ReadAll(res.Body)
     if err != nil {
@@ -631,24 +658,51 @@ func GoResponseToJSResponse(res *http.Response) js.Value {
     body := js.Global().Get("Uint8Array").New(len(b))
     js.CopyBytesToJS(body, b)
 
-    init := make(map[string]interface{})
-
-    init["status"] = res.StatusCode
-
-    headers := make(map[string]interface{})
-    init["headers"] = headers
-
-	return js.Global().Get("Response").New(body, init)
+	return js.Global().Get("Response").New(
+        body,
+        // init Object
+    )
 }
 ```
-<!-- .element: style="font-size: 0.46em;" -->
+<!-- .element: data-id="code" style="font-size: 0.38em;" -->
 
 Notes:
-- In order to build a Javascript `Response` object, we can use the `Response` constructor which takes 2 parameters, the response body and an init object for additional information such as status and headers.
-- The first parameter accepts several types, one of them is `BufferSource`, actually this is not a real type but either an `ArrayBuffer` or a `TypedArray`.
-- `TypedArray` is fine for us, it will allow us to use the `CopyBytesToJS()` function from the `syscall/js` package, which works just like `CopyBytesToGo()` but in the opposite direction.
-- So we read all of the response body content into a bytes slice, then create a new `Uint8Array()` of the same length, and finally call `CopyBytesToJS()`.
-- In order to build the init object, we can use a map of string to empty interface, which the `syscall/js` will transform to a new Javascript object.
+- First we have to read all of the response's body content into a bytes slice.
+- ▶ Then create a new `Uint8Array()` of the same length as the slice, and finally call `CopyBytesToJS()`.
+
+---
+
+## Go Response to JS Response
+
+<!-- .slide: data-auto-animate -->
+
+```go [1,9-12,17-21|1,13-15,17-21]
+func GoResponseToJSResponse(res *http.Response) js.Value {
+    b, err := ioutil.ReadAll(res.Body)
+    if err != nil {
+        panic(err)
+    }
+    body := js.Global().Get("Uint8Array").New(len(b))
+    js.CopyBytesToJS(body, b)
+
+    init := map[string]interface{}{
+        "status": res.StatusCode,
+        "headers": make(map[string]interface{}, len(res.Header)),
+    }
+    for k := range res.Header {
+        init["headers"][k] = res.Header.Get(k)
+    }
+
+	return js.Global().Get("Response").New(
+        body,
+        init,
+    )
+}
+```
+<!-- .element: data-id="code" style="font-size: 0.38em;" -->
+
+Notes:
+- In order to build the init object, we can use a map of string to empty interface, which the `syscall/js` is able to transform to a new Javascript object.
 - We only add two values, one for the response status code, and one for the headers, for which we can also use a map of string to empty interface.
 - And finally we can call the `Response` constructor.
 
@@ -656,30 +710,30 @@ Notes:
 
 ## Resolve Response Promise
 
-```go
+```go []
 go func() {
-    req := JSRequestToGoRequest(jsReq)
     resRecorder := httptest.NewRecorder()
 
-    handler.ServeHTTP(resRecorder, req)
+    handler.ServeHTTP(resRecorder, JSRequestToGoRequest(jsReq))
 
-    res := res.Result()
+    res := resRecorder.Result()
 
-    jsRes := GoResponseToJSResponse(res)
-
-    resolve(jsRes)
+    resolve(GoResponseToJSResponse(res))
 }()
 ```
+<!-- .element: style="font-size: 0.48em;" -->
 
 Notes:
-- Back to the goroutine responsible for handling the request, we can finally resolve the Promise with the Javascript Response we just build.
+- Back to the goroutine responsible for handling the request, we can finally resolve the Promise with the Javascript Response we just built.
 - And WE ARE DONE!
-- Now the question is, does this actually work?
-- Let's find out, with a first example.
+- Now, the question is, does this actually work?
+- Let's find out, with a simple example.
 
 ---
 
 ## JSON hello example
+
+FIXME replace by diagram, but keep next slide
 
 ```js
 navigator.serviceWorker.register('sw.js')
@@ -711,6 +765,8 @@ Notes:
 
 ## JSON hello example
 
+FIXME put all the code and highlight ?
+
 ```go
 http.HandleFunc("/hello", func(res http.ResponseWriter, req *http.Request) {
     params := make(map[string]string)
@@ -730,15 +786,25 @@ wasmhttp.Serve(nil)
 ```
 <!-- .element: style="font-size: 0.42em;" -->
 
-[![Demo link](assets/hang_glider_gopher_purple.png) <!-- .element: style="width: 200px;" -->](https://nlepage.github.io/go-wasm-http-server/hello/)
-
 Notes:
 - On the Go side, we only have one `HandleFunc`, which decodes the request body, then formats a hello message in the response body.
-- demo...
+
+---
+
+## JSON hello example
+
+👇 Click the gopher! 👇
+
+[![Hang gliding gopher](assets/hang_glider_gopher_purple.png) <!-- .element: style="width: 400px;" -->](https://nlepage.github.io/go-wasm-http-server/hello/)
+
+Notes:
+- Let's try this out!
 
 ---
 
 ## Catption example
+
+FIXME replace with a diagram
 
 ```js
 navigator.serviceWorker.register('sw.js')
@@ -755,16 +821,23 @@ navigator.serviceWorker.register('sw.js')
 ```
 <!-- .element: style="font-size: 0.42em;" -->
 
-[![Demo link](assets/slide_gopher_blue.png) <!-- .element: style="width: 200px;" -->](https://nlepage.github.io/catption/wasm/)
-
 Notes:
-- Now let's come back to our original example, which was the catption server.
+- Now let's come back to my little project, which was the catption server.
 - The hello example only used the WebAssembly binary to exchange JSON messages.
 - But this time the WebAssembly binary will actually serve the HTML page containing the form.
 - So what we can do is create a small HTML file, which will only be responsible for registering the ServiceWorker.
 - Once the ServiceWorker is activated, it will trigger a reload of the same address, which will now be served from the WebAssembly binary.
+
+---
+
+## Catption example
+
+👇 Click the gopher! 👇
+
+[![](assets/slide_gopher_blue.png) <!-- .element: style="width: 300px;" -->](https://nlepage.github.io/catption/wasm/)
+
+Notes:
 - Let's see if this works.
-- demo...
 
 ---
 
