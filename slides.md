@@ -42,7 +42,7 @@ Notes:
 
 - Since Go 1.11
 - May be executed in a browser
-- Has same limitations as JavaScript code
+- Has same limitations as JavaScript
 
 Notes:
 - Since Go 1.11, running a program written in Go in a browser is possible, if you build it to WebAssembly.
