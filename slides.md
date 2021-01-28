@@ -899,26 +899,30 @@ Notes:
 - This means we need at least one page to be loaded in the scope of the ServiceWorker, if we want to be able to keep it alive.
 - So the most we can do, is send periodic messages from the page to the ServiceWorker, in order to keep the browser from stopping the ServiceWorker as long as the page is loaded.
 - In summary, it is not really possible to have a stateful server leaving in a ServiceWorker.
-- However, one could imagine serializing the state of the server and storing it in the browser's LocalStorage or SessionStorage.
+- 🖵 However, one could imagine serializing the state of the server and storing it in the browser's LocalStorage or SessionStorage.
+
+---
+
+## The project
+
+[https://github.com/nlepage/go-wasm-http-server/](https://github.com/nlepage/go-wasm-http-server/#readme)
+
+Notes:
+- A lot more information is available on the github project page.
+- ...
+- If you give it a try please let me know, I will be glad to have your feedback.
 
 ---
 ## Conclusion
 
 Notes:
-- In conclusion, as you would expect, it is not really possible to deploy a Go HTTP server in a browser, however it is possible to execute Go HTTP handlers in a ServiceWorker.
+- 🖵 In conclusion, as you would expect, it is not really possible to deploy a Go HTTP server in a browser, however it is possible to execute Go HTTP handlers in a ServiceWorker.
 - Using build conditions allows to reuse most of the code we usually write for building a Go HTTP server, but targetting WebAssembly requires this code to be compatible.
 - And finally, we saw that deploying a long-running stateful server in a ServiceWorker is not a good idea, because of the lifecycle of ServiceWorkers.
-
----
-
-https://github.com/nlepage/go-wasm-http-server/
-
-Notes:
-FIXME
 
 ---
 ## Thank you
 
 Notes:
 - Thank you for listening, thank you to FOSDEM organizers, and to the Go devroom organizers.
-- More information is available on the github project, if you give it a try please let me know, I will be glad to have your feedback.
+- And a big thank you to all those who helped me prepare this talk.
