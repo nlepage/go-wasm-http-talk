@@ -14,7 +14,7 @@ css: assets/styles.css
 # Deploy a Go HTTP server in your browser
 
 Notes:
-- Hi everybody, my name is Nicolas Lepage, I am a developer at Zenika IT in France. I work a lot with Javascript, and I also like experimenting with Go.
+- Hi everybody, my name is Nicolas Lepage, I am a developer at Zenika IT in France. I work mostly with Javascript, and I also like experimenting with Go.
 - This is my first talk in english, so dont be surprised, I am a little out of practice.
 - Today I am going to talk about, deploying a Go HTTP server in your browser.
 
@@ -185,7 +185,16 @@ Notes:
 
 ---
 
-<!-- .slide: data-autoslide="1" -->
+## The plan
+
+![Plan diagram](assets/plan.png)
+
+Notes:
+- So let's review the plan!
+- First step, we intercept the HTTP request in the ServiceWorker, and send the Javascript Request object to the WebAssembly binary.
+- Second step in the WebAssembly binary, we map the Javascript request into a Go request, and call the handler.
+- Third step, once the handler has returned, we map the Go response into a Javascript Response Object, and send it back to the ServiceWorker.
+- Fourth and last step in the ServiceWorker, we respond to the HTTP request with the Javascript Response Object.
 
 ---
 
@@ -265,7 +274,8 @@ func Serve(handler http.Handler) {
 
 Notes:
 - Now let's dive in the implementation of this `Serve()` function.
-- It needs to receive the Javascript request objects, so from the Javascript point of view, the ServiceWorker needs to call the Webassembly binary with each `Request` object.
+- If you remember the first step of the plan, it needs to receive the Javascript request objects.
+- So from the Javascript point of view, the ServiceWorker needs to call the Webassembly binary with each `Request` object.
 - At the moment, Go Webassembly binaries have no way to export functions or other values to Javascript.
 - So, in order to work around this, the `Serve()` function will have to give a callback function to the ServiceWorker.
 
@@ -360,14 +370,14 @@ self.setGoCallback = v => {
 }
 
 self.addEventListener('fetch', e => {
-    e.respondWith(goCallback(e.request))
+    goCallback(e.request)
 })
 ```
 <!-- .element: style="font-size: 0.46em;" -->
 
 Notes:
 - From the ServiceWorker's point of view, we are now able to forward the FetchEvent's request to the WebAssembly binary.
-- ▶️ In the event handler, we just have to call the callback function with the `FetchEvent`'s request, and directly give the return value to the `FetchEvent`'s `respondWith()` method.
+- ▶️ In the event handler, we just have to call the callback function with the `FetchEvent`'s request.
 - ▶ The `self` variable is a reference to the ServiceWorker's global scope, so this is handy for making the `setGoCallback()` function available for WebAssembly the binary.
 - The actual code is a little more complex, because we have to use a Promise for the callback, otherwise a FetchEvent might occur before the callback is defined.
 
@@ -387,7 +397,7 @@ callback := js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
 <!-- .element: data-id="code" style="font-size: 0.42em;" -->
 
 Notes:
-- Next on the Go side, let's focus on implementing this callback function.
+- First step of the plan is done, now step two on the Go side, let's focus on implementing this callback function.
 - We said that this callback function must return a `Promise` for a Javascript `Response` object.
 
 ---
@@ -590,7 +600,8 @@ go func() {
 <!-- .element: data-id="code" style="font-size: 0.44em;" -->
 
 Notes:
-- We are almost ready to call the `Handler`, we just need a value to act as `ResponseWriter`.
+- We are almost with the step 2 of our plan, actually we are already starting step 3.
+- In order to call the `Handler`, we need a value to act as `ResponseWriter`.
 
 ---
 
@@ -615,8 +626,8 @@ Notes:
 - For this, we can use the `ResponseRecorder` type from the `httptest` package, which implements `ResponseWriter` and records the response.
 - And now we are able to call the `Handler`'s `ServerHTTP()` method.
 - Once the `Handler` returns, the `Result()` method of the `ResponseRecorder` allows us to get the HTTP response written by the handler.
-- We are almost done!
-- The last thing we need to do is build a Javascript `Response` object from the Go response, in other words the opposite of what we did with the request.
+- Now the step 2 is really done!
+- Step 3, we need to build a Javascript `Response` object from the Go response, in fact the opposite of what we did with the request.
 
 ---
 
@@ -725,6 +736,52 @@ go func() {
 
 Notes:
 - Back to the goroutine responsible for handling the request, we can finally resolve the Promise with the Javascript Response we just built.
+- And we are done with step 3.
+
+---
+
+## Sending back the Response
+
+<!-- .slide: data-auto-animate -->
+
+📄 `sw.js`
+```js []
+let goCallback
+self.setGoCallback = v => {
+    goCallback = v
+}
+
+self.addEventListener('fetch', e => {
+    goCallback(e.request) // returns a Promise for Response
+})
+```
+<!-- .element: data-id="code" style="font-size: 0.46em;" -->
+
+Notes:
+- Back in the ServiceWorker, now we know that the `goCallback()` function returns a promise for a response.
+- For the last step, we have to send back the response to the page.
+
+---
+
+## Sending back the Response
+
+<!-- .slide: data-auto-animate -->
+
+📄 `sw.js`
+```js []
+let goCallback
+self.setGoCallback = v => {
+    goCallback = v
+}
+
+self.addEventListener('fetch', e => {
+    e.respondWith(goCallback(e.request))
+})
+```
+<!-- .element: data-id="code" style="font-size: 0.46em;" -->
+
+Notes:
+- For that we can directly give the return value of the `goCallback()` function to the `FetchEvent`'s `respondWith()` method.
 - And WE ARE DONE!
 - Now, the question is, does this actually work?
 - Let's find out, with a simple example.
