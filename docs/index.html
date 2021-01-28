@@ -19,7 +19,7 @@
 # Deploy a Go HTTP server in your browser
 
 <aside class="notes"><ul>
-<li>Hi everybody, my name is Nicolas Lepage, I am a developer at Zenika IT in France. I work a lot with Javascript, and I also like experimenting with Go.</li>
+<li>Hi everybody, my name is Nicolas Lepage, I am a developer at Zenika IT in France. I work mostly with Javascript, and I also like experimenting with Go.</li>
 <li>This is my first talk in english, so dont be surprised, I am a little out of practice.</li>
 <li>Today I am going to talk about, deploying a Go HTTP server in your browser.</li>
 </ul>
@@ -190,9 +190,18 @@ http.ListenAndServe(":8080", r) // use mux router
 </ul>
 </aside></script></section><section data-markdown><script type="text/template">
 
-<!-- .slide: data-autoslide="1" -->
+## The plan
 
-</script></section><section data-markdown><script type="text/template">
+![Plan diagram](assets/plan.png)
+
+<aside class="notes"><ul>
+<li>So let&#39;s review the plan!</li>
+<li>First step, we intercept the HTTP request in the ServiceWorker, and send the Javascript Request object to the WebAssembly binary.</li>
+<li>Second step in the WebAssembly binary, we map the Javascript request into a Go request, and call the handler.</li>
+<li>Third step, once the handler has returned, we map the Go response into a Javascript Response Object, and send it back to the ServiceWorker.</li>
+<li>Fourth and last step in the ServiceWorker, we respond to the HTTP request with the Javascript Response Object.</li>
+</ul>
+</aside></script></section><section data-markdown><script type="text/template">
 
 ## Adding `js/wasm` target
 
@@ -270,7 +279,8 @@ func Serve(handler http.Handler) {
 
 <aside class="notes"><ul>
 <li>Now let&#39;s dive in the implementation of this <code>Serve()</code> function.</li>
-<li>It needs to receive the Javascript request objects, so from the Javascript point of view, the ServiceWorker needs to call the Webassembly binary with each <code>Request</code> object.</li>
+<li>If you remember the first step of the plan, it needs to receive the Javascript request objects.</li>
+<li>So from the Javascript point of view, the ServiceWorker needs to call the Webassembly binary with each <code>Request</code> object.</li>
 <li>At the moment, Go Webassembly binaries have no way to export functions or other values to Javascript.</li>
 <li>So, in order to work around this, the <code>Serve()</code> function will have to give a callback function to the ServiceWorker.</li>
 </ul>
@@ -365,14 +375,14 @@ self.setGoCallback = v => {
 }
 
 self.addEventListener('fetch', e => {
-    e.respondWith(goCallback(e.request))
+    goCallback(e.request)
 })
 ```
 <!-- .element: style="font-size: 0.46em;" -->
 
 <aside class="notes"><ul>
 <li>From the ServiceWorker&#39;s point of view, we are now able to forward the FetchEvent&#39;s request to the WebAssembly binary.</li>
-<li>▶️ In the event handler, we just have to call the callback function with the <code>FetchEvent</code>&#39;s request, and directly give the return value to the <code>FetchEvent</code>&#39;s <code>respondWith()</code> method.</li>
+<li>▶️ In the event handler, we just have to call the callback function with the <code>FetchEvent</code>&#39;s request.</li>
 <li>▶ The <code>self</code> variable is a reference to the ServiceWorker&#39;s global scope, so this is handy for making the <code>setGoCallback()</code> function available for WebAssembly the binary.</li>
 <li>The actual code is a little more complex, because we have to use a Promise for the callback, otherwise a FetchEvent might occur before the callback is defined.</li>
 </ul>
@@ -392,7 +402,7 @@ callback := js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
 <!-- .element: data-id="code" style="font-size: 0.42em;" -->
 
 <aside class="notes"><ul>
-<li>Next on the Go side, let&#39;s focus on implementing this callback function.</li>
+<li>First step of the plan is done, now step two on the Go side, let&#39;s focus on implementing this callback function.</li>
 <li>We said that this callback function must return a <code>Promise</code> for a Javascript <code>Response</code> object.</li>
 </ul>
 </aside></script></section><section data-markdown><script type="text/template">
@@ -595,7 +605,8 @@ go func() {
 <!-- .element: data-id="code" style="font-size: 0.44em;" -->
 
 <aside class="notes"><ul>
-<li>We are almost ready to call the <code>Handler</code>, we just need a value to act as <code>ResponseWriter</code>.</li>
+<li>We are almost with the step 2 of our plan, actually we are already starting step 3.</li>
+<li>In order to call the <code>Handler</code>, we need a value to act as <code>ResponseWriter</code>.</li>
 </ul>
 </aside></script></section><section data-markdown><script type="text/template">
 
@@ -620,8 +631,8 @@ go func() {
 <li>For this, we can use the <code>ResponseRecorder</code> type from the <code>httptest</code> package, which implements <code>ResponseWriter</code> and records the response.</li>
 <li>And now we are able to call the <code>Handler</code>&#39;s <code>ServerHTTP()</code> method.</li>
 <li>Once the <code>Handler</code> returns, the <code>Result()</code> method of the <code>ResponseRecorder</code> allows us to get the HTTP response written by the handler.</li>
-<li>We are almost done!</li>
-<li>The last thing we need to do is build a Javascript <code>Response</code> object from the Go response, in other words the opposite of what we did with the request.</li>
+<li>Now the step 2 is really done!</li>
+<li>Step 3, we need to build a Javascript <code>Response</code> object from the Go response, in fact the opposite of what we did with the request.</li>
 </ul>
 </aside></script></section><section data-markdown><script type="text/template">
 
@@ -730,6 +741,52 @@ go func() {
 
 <aside class="notes"><ul>
 <li>Back to the goroutine responsible for handling the request, we can finally resolve the Promise with the Javascript Response we just built.</li>
+<li>And we are done with step 3.</li>
+</ul>
+</aside></script></section><section data-markdown><script type="text/template">
+
+## Sending back the Response
+
+<!-- .slide: data-auto-animate -->
+
+📄 `sw.js`
+```js []
+let goCallback
+self.setGoCallback = v => {
+    goCallback = v
+}
+
+self.addEventListener('fetch', e => {
+    goCallback(e.request) // returns a Promise for Response
+})
+```
+<!-- .element: data-id="code" style="font-size: 0.46em;" -->
+
+<aside class="notes"><ul>
+<li>Back in the ServiceWorker, now we know that the <code>goCallback()</code> function returns a promise for a response.</li>
+<li>For the last step, we have to send back the response to the page.</li>
+</ul>
+</aside></script></section><section data-markdown><script type="text/template">
+
+## Sending back the Response
+
+<!-- .slide: data-auto-animate -->
+
+📄 `sw.js`
+```js []
+let goCallback
+self.setGoCallback = v => {
+    goCallback = v
+}
+
+self.addEventListener('fetch', e => {
+    e.respondWith(goCallback(e.request))
+})
+```
+<!-- .element: data-id="code" style="font-size: 0.46em;" -->
+
+<aside class="notes"><ul>
+<li>For that we can directly give the return value of the <code>goCallback()</code> function to the <code>FetchEvent</code>&#39;s <code>respondWith()</code> method.</li>
 <li>And WE ARE DONE!</li>
 <li>Now, the question is, does this actually work?</li>
 <li>Let&#39;s find out, with a simple example.</li>
@@ -738,61 +795,53 @@ go func() {
 
 ## JSON hello example
 
-FIXME replace by diagram, but keep next slide
-
-```js
-navigator.serviceWorker.register('sw.js')
-
-async function hello() {
-    const name = document.querySelector("#name").value
-
-    const res = await fetch('hello', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ name })
-    })
-
-    const { message } = await res.json()
-
-    alert(message)
-}
-```
-<!-- .element: style="font-size: 0.46em;" -->
+![Hello example diagram](assets/hello.png)
 
 <aside class="notes"><ul>
-<li>So on a small web page, we register the service worker.</li>
-<li>Then we have hello function which sends a POST request to the &#39;hello&#39; URL, with a JSON body containing only a name property.</li>
-<li>And it expects a JSON response with a message property, displayed in an alert.</li>
+<li>We have a small index.html page, which sends a POST request to /api/hello, with a JSON body containing a name property.</li>
+<li>This request should be handled by the api WebAssembly binary, which must return a JSON response with a message property.</li>
+<li>And this message will be displayed in an alert</li>
 </ul>
 </aside></script></section><section data-markdown><script type="text/template">
 
 ## JSON hello example
 
-FIXME put all the code and highlight ?
+```go [|12-24|26-27]
+package main
 
-```go
-http.HandleFunc("/hello", func(res http.ResponseWriter, req *http.Request) {
-    params := make(map[string]string)
-    if err := json.NewDecoder(req.Body).Decode(&params); err != nil {
-        panic(err)
-    }
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
 
-    res.Header().Add("Content-Type", "application/json")
-    if err := json.NewEncoder(res).Encode(map[string]string{
-        "message": fmt.Sprintf("Hello %s!", params["name"]),
-    }); err != nil {
-        panic(err)
-    }
-})
+	wasmhttp "github.com/nlepage/go-wasm-http-server"
+)
 
-wasmhttp.Serve(nil)
+func main() {
+	http.HandleFunc("/hello", func(res http.ResponseWriter, req *http.Request) {
+		params := make(map[string]string)
+		if err := json.NewDecoder(req.Body).Decode(&params); err != nil {
+			panic(err)
+		}
+
+		res.Header().Add("Content-Type", "application/json")
+		if err := json.NewEncoder(res).Encode(map[string]string{
+			"message": fmt.Sprintf("Hello %s!", params["name"]),
+		}); err != nil {
+			panic(err)
+		}
+	})
+
+	wasmhttp.Serve(nil)
+	select {} // block the main goroutine
+}
 ```
-<!-- .element: style="font-size: 0.42em;" -->
+<!-- .element: style="font-size: 0.28em;" -->
 
 <aside class="notes"><ul>
-<li>On the Go side, we only have one <code>HandleFunc</code>, which decodes the request body, then formats a hello message in the response body.</li>
+<li>On the Go side, ▶️ we only have one <code>HandleFunc</code>, which decodes the request body, then formats a hello message in the response body.</li>
+<li>▶️ And of course the call to <code>wasmhttp.Serve()</code>.</li>
+<li>We must also add something to block the main goroutine, here I used an empty select, which is not pretty, but works.</li>
 </ul>
 </aside></script></section><section data-markdown><script type="text/template">
 
@@ -807,35 +856,30 @@ wasmhttp.Serve(nil)
 </ul>
 </aside></script></section><section data-markdown><script type="text/template">
 
-## Catption example
+## 😺 Catption example
 
-FIXME replace with a diagram
-
-```js
-navigator.serviceWorker.register('sw.js')
-    .then(reg => {
-        const serviceWorker = reg.installing ?? reg.waiting ?? reg.active
-        if (serviceWorker.state === 'activated') {
-            document.location.reload()
-        } else {
-            serviceWorker.addEventListener('statechange', e => {
-                if (e.target.state === 'activated') document.location.reload()
-            })
-        }
-    })
-```
-<!-- .element: style="font-size: 0.42em;" -->
+<!-- .slide: data-auto-animate -->
 
 <aside class="notes"><ul>
 <li>Now let&#39;s come back to my little project, which was the catption server.</li>
 <li>The hello example only used the WebAssembly binary to exchange JSON messages.</li>
 <li>But this time the WebAssembly binary will actually serve the HTML page containing the form.</li>
+</ul>
+</aside></script></section><section data-markdown><script type="text/template">
+
+## 😺 Catption example
+
+<!-- .slide: data-auto-animate -->
+
+![Hello example diagram](assets/catption.png)
+
+<aside class="notes"><ul>
 <li>So what we can do is create a small HTML file, which will only be responsible for registering the ServiceWorker.</li>
 <li>Once the ServiceWorker is activated, it will trigger a reload of the same address, which will now be served from the WebAssembly binary.</li>
 </ul>
 </aside></script></section><section data-markdown><script type="text/template">
 
-## Catption example
+## 😺 Catption example
 
 👇 Click the gopher! 👇
 
@@ -850,7 +894,7 @@ navigator.serviceWorker.register('sw.js')
 
 <aside class="notes"><ul>
 <li>So far, in the examples I have been using, the server is stateless.</li>
-<li>This means it can be stopped and restarted as much as we want.</li>
+<li>🖵 This means it can be stopped and restarted as much as we want.</li>
 <li>And this is actually a good thing, because the lifecycle of ServiceWorkers is event based.</li>
 <li>The browser will start the ServiceWorker only when it is necessary, for example when a FetchEvent is received.</li>
 <li>Then if no more events are received, after some time the browser may decide to stop the ServiceWorker and kill the WebAssembly binary.</li>
@@ -860,27 +904,33 @@ navigator.serviceWorker.register('sw.js')
 <li>This means we need at least one page to be loaded in the scope of the ServiceWorker, if we want to be able to keep it alive.</li>
 <li>So the most we can do, is send periodic messages from the page to the ServiceWorker, in order to keep the browser from stopping the ServiceWorker as long as the page is loaded.</li>
 <li>In summary, it is not really possible to have a stateful server leaving in a ServiceWorker.</li>
-<li>However, one could imagine serializing the state of the server and storing it in the browser&#39;s LocalStorage or SessionStorage.</li>
+<li>🖵 However, one could imagine serializing the state of the server and storing it in the browser&#39;s LocalStorage or SessionStorage.</li>
+</ul>
+</aside></script></section><section data-markdown><script type="text/template">
+
+## The project
+
+[https://github.com/nlepage/go-wasm-http-server/](https://github.com/nlepage/go-wasm-http-server/#readme)
+
+<aside class="notes"><ul>
+<li>A lot more information is available on the github project page.</li>
+<li>...</li>
+<li>If you give it a try please let me know, I will be glad to have your feedback.</li>
 </ul>
 </aside></script></section><section data-markdown><script type="text/template">
 ## Conclusion
 
 <aside class="notes"><ul>
-<li>In conclusion, as you would expect, it is not really possible to deploy a Go HTTP server in a browser, however it is possible to execute Go HTTP handlers in a ServiceWorker.</li>
+<li>🖵 In conclusion, as you would expect, it is not really possible to deploy a Go HTTP server in a browser, however it is possible to execute Go HTTP handlers in a ServiceWorker.</li>
 <li>Using build conditions allows to reuse most of the code we usually write for building a Go HTTP server, but targetting WebAssembly requires this code to be compatible.</li>
 <li>And finally, we saw that deploying a long-running stateful server in a ServiceWorker is not a good idea, because of the lifecycle of ServiceWorkers.</li>
 </ul>
-</aside></script></section><section data-markdown><script type="text/template">
-
-https://github.com/nlepage/go-wasm-http-server/
-
-<aside class="notes"><p>FIXME</p>
 </aside></script></section><section data-markdown><script type="text/template">
 ## Thank you
 
 <aside class="notes"><ul>
 <li>Thank you for listening, thank you to FOSDEM organizers, and to the Go devroom organizers.</li>
-<li>More information is available on the github project, if you give it a try please let me know, I will be glad to have your feedback.</li>
+<li>And a big thank you to all those who helped me prepare this talk.</li>
 </ul>
 </aside></script></section></section></div>
     </div>
