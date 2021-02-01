@@ -175,7 +175,7 @@ http.ListenAndServe(":8080", r) // use mux router
 
 Notes:
 - Then, once our handlers are defined, in most cases we will call `ListenAndServe()`, which will start listening for HTTP requests and use our handlers to respond to these.
-- In our case, we would like to reuse as much as possible of this code we wrote, but use it to respond to a request intercepted by a SW.
+- ▶️ In our case, we would like to reuse as much as possible of this code we wrote, but use it to respond to a request intercepted by a SW.
 - Provided the handlers are WebAssembly compatible, we can keep and reuse them as they are.
 - So this is nice, because the handlers are the main part of our code, this is where we declare all the logic.
 - Of course, the one thing we are not going to be able to reuse is the call to `ListenAndServe()`.
@@ -898,8 +898,7 @@ Notes:
 - The ServiceWorkers specification does not allow to keep a ServiceWorker alive if it has no clients.
 - This means we need at least one page to be loaded in the scope of the ServiceWorker, if we want to be able to keep it alive.
 - So the most we can do, is send periodic messages from the page to the ServiceWorker, in order to keep the browser from stopping the ServiceWorker as long as the page is loaded.
-- In summary, it is not really possible to have a stateful server leaving in a ServiceWorker.
-- 🖵 However, one could imagine serializing the state of the server and storing it in the browser's LocalStorage or SessionStorage.
+- 🖵 In summary, it is not really possible to have a stateful server leaving in a ServiceWorker.
 
 ---
 
@@ -908,9 +907,9 @@ Notes:
 [https://github.com/nlepage/go-wasm-http-server/](https://github.com/nlepage/go-wasm-http-server/#readme)
 
 Notes:
-- A lot more information is available on the github project page.
-- ...
-- If you give it a try please let me know, I will be glad to have your feedback.
+- More information is available on the github project page.
+- Including a usage section, to help you do the same with your own project.
+- If you give it a try please let me know, I'll be glad to have your feedback.
 
 ---
 ## Conclusion
