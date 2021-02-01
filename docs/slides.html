@@ -333,7 +333,7 @@ func Serve(handler http.Handler) {
 <!-- .element: data-id="code" style="font-size: 0.42em;" -->
 
 <aside class="notes"><ul>
-<li>Our callback function will have one request parameter of type <code>js.Value</code>, this type represents a Javascript value for Go.</li>
+<li>The callback function needs only the first argument, which is the Javascript request object.</li>
 <li>And it will return one value, which will have to be a Javascript <code>Promise</code> for a Javascript <code>Response</code> object.</li>
 </ul>
 </aside></script></section><section data-markdown><script type="text/template">

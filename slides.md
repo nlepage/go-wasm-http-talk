@@ -328,7 +328,7 @@ func Serve(handler http.Handler) {
 <!-- .element: data-id="code" style="font-size: 0.42em;" -->
 
 Notes:
-- Our callback function will have one request parameter of type `js.Value`, this type represents a Javascript value for Go.
+- The callback function needs only the first argument, which is the Javascript request object.
 - And it will return one value, which will have to be a Javascript `Promise` for a Javascript `Response` object.
 
 ---
