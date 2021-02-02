@@ -687,7 +687,7 @@ Notes:
 
 <!-- .slide: data-auto-animate -->
 
-```go [1,9-12,21|1,13-15,21|1,17-21]
+```go [1,9-15,21|1,17-21]
 func GoResponseToJSResponse(res *http.Response) js.Value {
     b, err := ioutil.ReadAll(res.Body)
     if err != nil {
@@ -715,7 +715,7 @@ func GoResponseToJSResponse(res *http.Response) js.Value {
 Notes:
 - In order to build the init object, we can use a map of string to empty interface, which the `syscall/js` is able to transform to a new Javascript object.
 - We only add two values, one for the response status code, and one for the headers, for which we can also use a map of string to empty interface.
-- And finally we can call the `Response` constructor.
+- ▶ And finally we can call the `Response` constructor.
 
 ---
 
