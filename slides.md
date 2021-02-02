@@ -660,7 +660,7 @@ Notes:
 
 <!-- .slide: data-auto-animate -->
 
-```go [1,2-5,13|1,6-12,13]
+```go [1,2-5,13|1,6-7,13]
 func GoResponseToJSResponse(res *http.Response) js.Value {
     b, err := ioutil.ReadAll(res.Body)
     if err != nil {
