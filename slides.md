@@ -14,9 +14,9 @@ css: assets/styles.css
 # Deploy a Go HTTP server in your browser
 
 Notes:
-- Hi everybody, my name is Nicolas Lepage from Zenika Nantes.
-- I'm a developer, I work mostly with Javascript, and I also like experimenting with Go.
-- I'm really happy to take part in this first technozaure world, and I hope you're having a good time.
+- Hi everybody. I hope you're having a good time. I'm really happy to take part in this first technozaure world.
+- I'm Nicolas Lepage, I'm a developer from Zenika Nantes.
+- I work mostly with Javascript, and I also like experimenting with Go.
 - Today I am going to talk about, deploying a Go HTTP server in your browser.
 
 ---
@@ -146,9 +146,9 @@ r.HandleFunc("/bar", handleBar)
 <!-- .element: data-id="code" style="font-size: 0.42em;" -->
 
 Notes:
-- First we define HTTP handlers which can values compatible with the `Handler` interface or ` simple functions.
-- Indeed, handlers are simple functions which receive a `ResponseWriter` and a `Request`; so we can already see that this looks a lot like the service worker's `FetchEvent`, we have the request informations and a way to write a resposne.
-- ▶️ We may also choose to define handlers using some third party libraries, such as `gorilla/mux`.
+- First we define HTTP handlers which can be values compatible with the `Handler` interface or simple functions.
+- Indeed, handlers are simple functions which receive a `ResponseWriter` and a `Request`; so we can already see that this looks a lot like the service worker's `FetchEvent`, we have the request informations and a way to write a response.
+- ▶️ We may also choose to define handlers using some third party libraries, such as `gorilla/mux`, but this is the same.
 
 ---
 
@@ -179,9 +179,9 @@ Notes:
 - Provided the handlers are WebAssembly compatible, we can keep and reuse them as they are.
 - So this is nice, because the handlers are the main part of our code, this is where we declare all the logic.
 - Of course, the one thing we are not going to be able to reuse is the call to `ListenAndServe()`.
-- But, this is OK, because we are going to take a pretty radical shortcut.
+- But, it's OK, because we are going to take a pretty radical shortcut.
 - Ususally when we call `ListenAndServe()`, it takes care of a lot of things for us under the hood, and for each request it calls the `Handler` if we gave one in parameter or `DefaultServeMux`, which is the default `Handler`.
-- So, what we can actually do is, directly call the `ServeHTTP()` method of the `Handler` or of `DefaultServeMux`.
+- So, what we can actually do is, directly call the `Handler` or `DefaultServeMux` without going through `ListenAndServe()`.
 
 ---
 
@@ -300,7 +300,7 @@ func Serve(handler http.Handler) {
 <!-- .element: data-id="code" style="font-size: 0.42em;" -->
 
 Notes:
-- The `syscall/js` package allows to create such callback functions using `FuncOf()`.
+- Such callback functions may be created using `FuncOf()` from the standard library's `syscall/js` package.
 - `FuncOf()` takes a Go function, and creates a JavaScript function from it.
 
 ---
@@ -377,7 +377,7 @@ Notes:
 - From the ServiceWorker's point of view, we are now able to forward the FetchEvent's request to the WebAssembly binary.
 - ▶️ In the event handler, we just have to call the callback function with the request object.
 - ▶ `self` is a reference to the global scope, so that's handy for making references available to the WebAssembly binary.
-- The actual code is a little more complex, because we have to use a Promise for the callback, otherwise a FetchEvent might occur before the callback is defined.
+- Just a word, the actual code is a little more complex, because we have to use a Promise for the callback, otherwise a FetchEvent might occur before the callback is defined.
 
 ---
 
@@ -419,8 +419,8 @@ callback := js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
 
 Notes:
 - So let's create a new `Promise`, and return it.
-- The `NewPromise` function I am using here is not part of the standard library, it's a utility function to ease the creation of a new JavaScript `Promise`, which can be a little cumbersome.
-- Returning a promise means the callback function is asynchronous, so we need to start a new goroutine...
+- The `NewPromise` function I am using here is not part of the standard library, it's a utility function, to hide the creation of a new JavaScript `Promise`, which can be cumbersome and pretty ugly.
+- OK! Returning a promise means the callback function is asynchronous, so we need to start a new goroutine...
 
 ---
 
@@ -446,7 +446,7 @@ callback := js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
 Notes:
 - ...otherwise the ServiceWorker would be blocked.
 - And starting a new goroutine actually makes sense, because this is how a Go HTTP server usually works, it starts a new goroutine for each request.
-- And this is it for the callback function, the rest of the work will be done in the new goroutine.
+- And this is it for the callback function, the rest of the work will be carried out in the new goroutine.
 
 ---
 
@@ -518,8 +518,8 @@ func CopyBytesToGo(dst []byte, src js.Value) int
 
 Notes:
 - Luckily for us, the standard library has a `CopyBytesToGo()` function, just for that.
-- It takes a bytes slice as destination, and a reference to a Javascript typed array of unsigned 8 bit integers as source.
-- With just a few more plumbing we should be able to copy the body content from Javascript to Go.
+- It takes a bytes slice as destination, and a reference to a Javascript typed array of bytes as source.
+- With just a few more plumbing we should be able to copy the body contents from Javascript to Go.
 
 ---
 
@@ -548,7 +548,7 @@ Notes:
 - We wait for this `Promise` to be resolved, ▶ then we can wrap the `ArrayBuffer`, into a typed array of bytes.
 - ▶ And now we can create a slice of bytes, and finally call `CopyBytesToGo()`.
 - ▶ A bytes buffer will do just fine for the body parameter of `NewRequest()`.
-- Now we have a Go request, the only important information missing on this request, is the headers.
+- And now we have a Go request, the only important information missing, is the headers.
 
 ---
 ## JS Request to Go Request
@@ -648,7 +648,7 @@ func GoResponseToJSResponse(res *http.Response) js.Value {
 <!-- .element: data-id="code" style="font-size: 0.38em;" -->
 
 Notes:
-- In order to build a Javascript `Response` object, we can use the `Response` constructor which takes 2 parameters, the response body and an init object for additional information such as status code and headers.
+- In order to build a Javascript `Response` object, we have to use the `Response` constructor which takes 2 parameters, the response body and an init object for additional information such as status code and headers.
 - The body parameter accepts several types, and one of them is `TypedArray` which will allow us to use the `CopyBytesToJS()` function from the standard library, which works just like `CopyBytesToGo()` but in the opposite direction.
 
 ---
@@ -733,7 +733,7 @@ go func() {
 
 Notes:
 - Back to the goroutine responsible for handling the request, we can finally resolve the Promise with the Javascript Response we just built.
-- And step 3 is done, at this point, the Go WebAssembly binary has achieved its work.
+- And step 3 is done! At this point, the Go WebAssembly binary has achieved its work.
 
 ---
 
@@ -790,8 +790,8 @@ Notes:
 ![Hello example diagram](assets/hello.png)
 
 Notes:
-- We have a small index.html page, which sends a POST request to hello API, with a JSON body containing a name property.
-- This request should be handled by the API WebAssembly binary, which must return a JSON response with a message property.
+- We have a small index.html page, which sends a POST request to the hello API, with a JSON body containing a name property.
+- This request must be handled by the API, in fact WebAssembly binary, which must return a JSON response with a message property.
 
 ---
 
@@ -890,9 +890,9 @@ Notes:
 - The browser will start the ServiceWorker only when it is necessary, for example when a FetchEvent is received.
 - Then if no more events are received, after some time the browser may decide to stop the ServiceWorker and kill the WebAssembly binary.
 - So if my server is stateful, the state will be lost.
-- So how can we work around this? Well there is no real solution here.
+- So how can we work around this? Well there's no real solution here.
 - The ServiceWorkers specification does not allow to keep a ServiceWorker alive if it has no clients.
-- This means we need at least one page to be loaded in the scope of the ServiceWorker, if we want to be able to keep it alive.
+- This means having at least one page loaded in the scope of the ServiceWorker.
 - So the most we can do, is send periodic messages from the page to the ServiceWorker, in order to keep the browser from stopping the ServiceWorker as long as the page is loaded.
 - 🖵 In summary, it is not really possible to have a stateful server leaving in a ServiceWorker.
 
@@ -919,5 +919,5 @@ Notes:
 ## Thank you
 
 Notes:
-- Thank you for listening, thank you to FOSDEM organizers, and to the Go devroom organizers.
-- And a big thank you to all those who helped me prepare this talk.
+- Thank you for listening, thank you to the organizers of the tehcnozaure.
+- If you have any questions, or you just want to talk, I'll be available in the Q&A area.
